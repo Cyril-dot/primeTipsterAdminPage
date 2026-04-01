@@ -1,20 +1,31 @@
 /* ═══════════════════════════════════════════════════════
    GStake Admin — API Integration Layer
-   All real API calls go through this module.
    ═══════════════════════════════════════════════════════ */
 
-const API_BASE = 'https://kikiwebbackend.onrender.com/api/v1';
-const ADMIN_API = 'https://kikiwebbackend.onrender.com/api/v1/admin';
+const API_BASE          = 'https://kikiwebbackend.onrender.com/api/v1';
+const ADMIN_API         = 'https://kikiwebbackend.onrender.com/api/v1/admin';
 const CORRECT_SCORE_API = 'https://kikiwebbackend.onrender.com/api/admin/correct-score';
 
 /* ── Auth helpers ── */
+
+/**
+ * Token priority:
+ *  1. gstake_admin_token  — set after apiAdminLogin()
+ *  2. gstake_token        — set after regular register / login (user may be ADMIN role)
+ */
 function getToken() {
-  return localStorage.getItem('gstake_admin_token');
+  return localStorage.getItem('gstake_admin_token')
+      || localStorage.getItem('gstake_token')
+      || null;
 }
 
 function getAdminData() {
   try {
-    return JSON.parse(localStorage.getItem('gstake_admin') || '{}');
+    return JSON.parse(
+      localStorage.getItem('gstake_admin') ||
+      localStorage.getItem('gstake_user') ||
+      '{}'
+    );
   } catch {
     return {};
   }
@@ -32,15 +43,18 @@ function requireAuth() {
 /* ── Core fetch wrapper ── */
 async function apiFetch(url, options = {}) {
   const token = getToken();
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
 
+  console.debug('[apiFetch]', options.method || 'GET', url,
+    token ? '(token present)' : '⚠️ NO TOKEN');
+
   const res = await fetch(url, { ...options, headers });
 
-  // Handle 401 — token expired / invalid
   if (res.status === 401) {
     localStorage.removeItem('gstake_admin_token');
     localStorage.removeItem('gstake_admin');
@@ -51,10 +65,11 @@ async function apiFetch(url, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    // Log full response body to console so you can see validation errors
+    console.error('[apiFetch] error response:', data);
     throw new Error(data.message || data.error || `Request failed (${res.status})`);
   }
 
-  // Unwrap standard ApiResponse wrapper: { status, message, data }
   return data.data !== undefined ? data.data : data;
 }
 
@@ -68,7 +83,6 @@ async function apiAdminLogin(email, password) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
-  // data is already unwrapped — contains token + admin info
   localStorage.setItem('gstake_admin_token', data.token);
   localStorage.setItem('gstake_admin', JSON.stringify(data));
   return data;
@@ -76,7 +90,6 @@ async function apiAdminLogin(email, password) {
 
 /** POST /api/v1/admin/register */
 async function apiAdminRegister(fullName, email, password) {
-  // FIX: explicitly set method to POST and use absolute URL
   return apiFetch(`${ADMIN_API}/register`, {
     method: 'POST',
     body: JSON.stringify({ fullName, email, password }),
@@ -116,11 +129,15 @@ async function apiGetGameById(gameId) {
   return apiFetch(`${API_BASE}/games/public/${gameId}`);
 }
 
-/** POST /api/v1/admin/games */
+/**
+ * POST /api/v1/admin/games
+ * Ensures matchDate is a full ISO-8601 string: "2025-07-15T14:30:00"
+ * (datetime-local input gives "2025-07-15T14:30" — missing seconds → Spring rejects it)
+ */
 async function apiAddGame(payload) {
   return apiFetch(`${ADMIN_API}/games`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normaliseGamePayload(payload)),
   });
 }
 
@@ -128,7 +145,7 @@ async function apiAddGame(payload) {
 async function apiUpdateGame(gameId, payload) {
   return apiFetch(`${ADMIN_API}/games/${gameId}`, {
     method: 'PATCH',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normaliseGamePayload(payload)),
   });
 }
 
@@ -148,6 +165,25 @@ async function apiEnterResult(gameId, homeScore, awayScore) {
 /** POST /api/v1/admin/games/{gameId}/cancel */
 async function apiCancelGame(gameId) {
   return apiFetch(`${ADMIN_API}/games/${gameId}/cancel`, { method: 'POST' });
+}
+
+/**
+ * Normalise a game payload before sending:
+ *  - matchDate: "2025-07-15T14:30"  →  "2025-07-15T14:30:00"
+ *  - bookingCode: strip empty string (send null / omit so backend auto-generates)
+ */
+function normaliseGamePayload(payload) {
+  const p = { ...payload };
+
+  if (p.matchDate && p.matchDate.length === 16) {
+    p.matchDate = p.matchDate + ':00';           // add missing seconds
+  }
+
+  if (!p.bookingCode) {
+    delete p.bookingCode;                        // let backend auto-generate
+  }
+
+  return p;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -173,7 +209,7 @@ async function apiRevealCSMarket(gameId, homeScore, awayScore) {
 }
 
 /* ══════════════════════════════════════════════════════
-   BET SLIPS (admin view)
+   BET SLIPS
 ══════════════════════════════════════════════════════ */
 
 /** GET /api/v1/bets/slip/{reference} */
@@ -182,7 +218,7 @@ async function apiGetSlipByReference(reference) {
 }
 
 /* ══════════════════════════════════════════════════════
-   WALLET / TRANSACTIONS (admin view)
+   WALLET / TRANSACTIONS
 ══════════════════════════════════════════════════════ */
 
 /** GET /api/v1/wallet/transactions */
@@ -191,9 +227,8 @@ async function apiGetTransactions() {
 }
 
 /* ══════════════════════════════════════════════════════
-   STATUS HELPERS
+   LOGOUT
 ══════════════════════════════════════════════════════ */
-
 function adminLogout() {
   localStorage.removeItem('gstake_admin_token');
   localStorage.removeItem('gstake_admin');
