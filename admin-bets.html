@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Bet Slips</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.tabs { display: flex; gap: .4rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.tab-btn { padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--t2); font-size: .83rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.tab-btn.active { background: var(--accentBg); color: var(--accent); border-color: var(--borderAcc); }
+.tab-btn:hover:not(.active) { border-color: var(--borderHov); color: var(--t1); }
+.tab-btn.cs-tab.active { background: rgba(96,165,250,.12); color: var(--blue); border-color: rgba(96,165,250,.35); }
+
+.selection-item { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem; border-radius: var(--r); background: var(--bg3); margin-bottom: .5rem; }
+.selection-match { font-size: .83rem; font-weight: 600; flex: 1; }
+.selection-market { font-size: .72rem; color: var(--t2); }
+.selection-odds { font-family: var(--ffC); font-size: 1rem; font-weight: 700; color: var(--accent); }
+.cs-score-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--ffC); font-size: .85rem; font-weight: 700; background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); border-radius: 6px; padding: 2px 8px; margin-left: 6px; }
+.payout-card { background: var(--accentBg); border: 1px solid var(--borderAcc); border-radius: var(--r); padding: .75rem 1rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.payout-label { font-size: .75rem; color: var(--t2); }
+.payout-val { font-family: var(--ffC); font-size: 1.4rem; font-weight: 800; color: var(--accent); }
+.pagination { display: flex; align-items: center; gap: .4rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+.page-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--t2); font-size: .82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.page-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.page-btn:hover:not(.active) { border-color: var(--borderHov); color: var(--t1); }
+.page-info { font-size: .8rem; color: var(--t2); padding: 0 .5rem; }
+
+/* ── Backend gap notice ── */
+.gap-notice { background: var(--bg3); border: 1px solid var(--border); border-left: 3px solid var(--orange); border-radius: var(--r); padding: .75rem 1rem; font-size: .78rem; color: var(--t2); margin-bottom: 1.25rem; line-height: 1.6; }
+.gap-notice code { background: var(--bg1); border-radius: 4px; padding: 1px 5px; color: var(--accent); font-size: .75rem; }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<nav class="top-nav" id="topNav"></nav>
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<main class="main">
+  <div class="page-content">
+
+    <div class="page-header">
+      <div>
+        <div class="page-title">Bet Slips</div>
+        <div class="page-sub">Review all placed wagers, winnings, and bet settlements.</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-sm" onclick="loadBets()">
+          <svg data-lucide="refresh-cw"></svg> Refresh
+        </button>
+      </div>
+    </div>
+
+    <!--
+      ⚠️ BACKEND GAP NOTICE
+      The provided controllers only expose user-scoped bet endpoints:
+        GET /api/v1/bets/my         — requires USER role, returns only that user's bets
+        GET /api/v1/bets/slip/{ref} — requires USER role
+
+      To power this admin view, implement an admin endpoint:
+        GET /api/v1/admin/bets?status=&page=&size=
+      with ROLE_ADMIN access in BettingController (or a new AdminBettingController).
+      The frontend is wired and ready — just swap the fetch URL below.
+    -->
+    <div class="gap-notice">
+      <strong style="color:var(--orange)">⚠️ Backend extension required:</strong>
+      This page needs <code>GET /api/v1/admin/bets</code> with <code>ROLE_ADMIN</code> access to list all users' slips.
+      Implement it and update <code>ADMIN_BETS_ENDPOINT</code> in this file. Individual slip lookup via reference works now.
+    </div>
+
+    <!-- Search by reference -->
+    <div class="filter-bar" style="margin-bottom:1.25rem">
+      <div class="search-wrap" style="flex:1;max-width:400px">
+        <svg data-lucide="search"></svg>
+        <input type="text" class="search-input" id="refSearch"
+          placeholder="Enter slip reference (e.g. SLIP-20250402-ABC123)…">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="lookupByReference()">
+        <svg data-lucide="search"></svg> Lookup
+      </button>
+    </div>
+
+    <div class="alert alert-error" id="lookupError" style="margin-bottom:1rem">
+      <svg data-lucide="alert-circle"></svg>
+      <span id="lookupErrorMsg">Slip not found.</span>
+    </div>
+
+    <!-- Slip detail panel (shown after lookup) -->
+    <div id="slipDetailPanel" style="display:none">
+      <div class="card" style="margin-bottom:1.5rem">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="sdRef">Slip Detail</div>
+            <div style="font-size:.78rem;color:var(--t2)" id="sdUser"></div>
+          </div>
+          <span class="badge" id="sdStatusBadge"></span>
+        </div>
+
+        <div class="payout-card">
+          <div>
+            <div class="payout-label">Stake</div>
+            <div class="payout-val" id="sdStake">—</div>
+          </div>
+          <div style="text-align:center">
+            <div class="payout-label">Total Odds</div>
+            <div class="payout-val" id="sdOdds">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="payout-label">Potential Payout</div>
+            <div class="payout-val" id="sdPotential">—</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:.75rem;font-family:var(--ffC);font-size:.85rem;font-weight:700;color:var(--t2);letter-spacing:.8px;text-transform:uppercase">Selections</div>
+        <div id="sdSelections"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+          <div style="font-size:.82rem;color:var(--t2)">Placed At</div>
+          <div id="sdPlacedAt" style="font-size:.82rem;color:var(--t1)">—</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.5rem">
+          <div style="font-size:.82rem;color:var(--t2)">Actual Payout</div>
+          <div id="sdActualPayout" style="font-family:var(--ffC);font-size:1.1rem;font-weight:700;color:var(--green)">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin bets table (visible once backend endpoint is implemented) -->
+    <div id="adminBetsSection" style="display:none">
+      <div class="tabs" id="betTabs">
+        <button class="tab-btn active" onclick="filterBets('ALL', this)">All</button>
+        <button class="tab-btn" onclick="filterBets('PENDING', this)">Pending</button>
+        <button class="tab-btn" onclick="filterBets('WON', this)">Won</button>
+        <button class="tab-btn" onclick="filterBets('LOST', this)">Lost</button>
+        <button class="tab-btn" onclick="filterBets('VOID', this)">Void</button>
+        <button class="tab-btn cs-tab" onclick="filterBets('CORRECT_SCORE', this)">
+          <svg data-lucide="target" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px"></svg>Correct Score
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>User</th>
+              <th>Stake</th>
+              <th>Total Odds</th>
+              <th>Potential Payout</th>
+              <th>Actual Payout</th>
+              <th>Status</th>
+              <th>Placed At</th>
+            </tr>
+          </thead>
+          <tbody id="betsBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="betsPagination"></div>
+    </div>
+
+  </div>
+</main>
+
+<script src="admin-api.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+/*
+ * ── WIRING INSTRUCTION ──────────────────────────────────────────────
+ * Once you add GET /api/v1/admin/bets (with optional ?status= & ?page=)
+ * to your backend, replace the ADMIN_BETS_ENDPOINT constant below,
+ * uncomment the loadBets() call, and the full table will populate.
+ * ────────────────────────────────────────────────────────────────────
+ */
+const ADMIN_BETS_ENDPOINT = null; // e.g. '/api/v1/admin/bets'
+
+let ALL_BETS = [];
+let betFilter = 'ALL';
+let BET_PAGE = 1;
+const BET_PER_PAGE = 10;
+
+window.addEventListener('load', () => {
+  requireAuth();
+  injectAdminShell('admin-bets.html');
+  if (ADMIN_BETS_ENDPOINT) loadBets();
+});
+
+/* Load all bets from admin endpoint (when implemented) */
+async function loadBets() {
+  try {
+    ALL_BETS = await apiFetch(ADMIN_BETS_ENDPOINT);
+    document.getElementById('adminBetsSection').style.display = 'block';
+    renderBetsTable();
+  } catch (err) {
+    console.warn('Admin bets endpoint not available:', err.message);
+  }
+}
+
+function filterBets(status, btn) {
+  betFilter = status;
+  BET_PAGE = 1;
+  document.querySelectorAll('#betTabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBetsTable();
+}
+
+function renderBetsTable() {
+  const filtered = ALL_BETS.filter(b => {
+    if (betFilter === 'CORRECT_SCORE') return b.selections?.some(s => s.marketType === 'CORRECT_SCORE');
+    if (betFilter !== 'ALL') return b.status === betFilter;
+    return true;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / BET_PER_PAGE) || 1;
+  const page = filtered.slice((BET_PAGE - 1) * BET_PER_PAGE, BET_PAGE * BET_PER_PAGE);
+  const statusClass = { PENDING: 'pending', WON: 'won', LOST: 'failed', VOID: 'void', CANCELLED: 'void' };
+
+  const tbody = document.getElementById('betsBody');
+  tbody.innerHTML = page.length
+    ? page.map(b => {
+      const hasCS = b.selections?.some(s => s.marketType === 'CORRECT_SCORE');
+      return `<tr>
+        <td>
+          <div style="font-family:monospace;font-size:.83rem;font-weight:700;color:var(--accent)">${b.slipReference}</div>
+          <div style="font-size:.7rem;color:var(--t3)">${b.selections?.length || 0} selection(s)
+            ${hasCS ? '<span style="background:rgba(96,165,250,.12);color:var(--blue);border:1px solid rgba(96,165,250,.3);border-radius:4px;padding:1px 5px;font-size:.65rem;font-weight:700;margin-left:4px">CS</span>' : ''}
+          </div>
+        </td>
+        <td style="font-size:.82rem">${b.userId || '—'}</td>
+        <td style="font-family:var(--ffC);font-weight:700">GHS ${Number(b.stake).toLocaleString()}</td>
+        <td style="font-family:var(--ffC);font-weight:700;color:var(--accent)">${Number(b.totalOdds).toFixed(2)}x</td>
+        <td>GHS ${Number(b.potentialPayout).toLocaleString()}</td>
+        <td style="font-family:var(--ffC);font-weight:700;color:var(--green)">${b.actualPayout ? 'GHS ' + Number(b.actualPayout).toLocaleString() : '—'}</td>
+        <td><span class="badge badge-${statusClass[b.status] || 'pending'}">${b.status}</span></td>
+        <td class="td-muted">${b.placedAt ? new Date(b.placedAt).toLocaleString('en-GB') : '—'}</td>
+      </tr>`;
+    }).join('')
+    : `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--t2)">No bet slips found.</td></tr>`;
+
+  let pages = '';
+  for (let i = 1; i <= Math.min(totalPages, 5); i++) {
+    pages += `<button class="page-btn${i === BET_PAGE ? ' active' : ''}" onclick="goBetPage(${i})">${i}</button>`;
+  }
+  document.getElementById('betsPagination').innerHTML =
+    `<button class="page-btn" onclick="goBetPage(${BET_PAGE - 1})" ${BET_PAGE <= 1 ? 'disabled' : ''}>←</button>
+     ${pages}
+     <span class="page-info">${total} slips</span>
+     <button class="page-btn" onclick="goBetPage(${BET_PAGE + 1})" ${BET_PAGE >= totalPages ? 'disabled' : ''}>→</button>`;
+
+  lucide.createIcons();
+}
+
+function goBetPage(p) {
+  const total = Math.ceil(ALL_BETS.length / BET_PER_PAGE) || 1;
+  if (p < 1 || p > total) return;
+  BET_PAGE = p;
+  renderBetsTable();
+}
+
+/* ── Single slip lookup by reference ── */
+async function lookupByReference() {
+  const ref = document.getElementById('refSearch').value.trim().toUpperCase();
+  if (!ref) return;
+
+  document.getElementById('lookupError').classList.remove('show');
+  document.getElementById('slipDetailPanel').style.display = 'none';
+
+  try {
+    // GET /api/v1/bets/slip/{reference}
+    const slip = await apiGetSlipByReference(ref);
+    renderSlipDetail(slip);
+  } catch (err) {
+    document.getElementById('lookupErrorMsg').textContent = err.message;
+    document.getElementById('lookupError').classList.add('show');
+    lucide.createIcons();
+  }
+}
+
+document.getElementById('refSearch')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') lookupByReference();
+});
+
+function renderSlipDetail(slip) {
+  const MARKET_LABELS = { HOME_WIN: 'Home Win', AWAY_WIN: 'Away Win', DRAW: 'Draw', CORRECT_SCORE: 'Correct Score' };
+  const statusClass = { PENDING: 'pending', WON: 'won', LOST: 'failed', VOID: 'void', CANCELLED: 'void' };
+  const curr = 'GHS';
+
+  document.getElementById('sdRef').textContent = slip.slipReference;
+  document.getElementById('sdUser').textContent = slip.userId || 'User';
+  document.getElementById('sdStatusBadge').className = `badge badge-${statusClass[slip.status] || 'pending'}`;
+  document.getElementById('sdStatusBadge').textContent = slip.status;
+  document.getElementById('sdStake').textContent = `${curr} ${Number(slip.stake).toLocaleString()}`;
+  document.getElementById('sdOdds').textContent = `${Number(slip.totalOdds).toFixed(2)}x`;
+  document.getElementById('sdPotential').textContent = `${curr} ${Number(slip.potentialPayout).toLocaleString()}`;
+  document.getElementById('sdActualPayout').textContent = slip.actualPayout
+    ? `${curr} ${Number(slip.actualPayout).toLocaleString()}`
+    : '—';
+  document.getElementById('sdPlacedAt').textContent = slip.placedAt
+    ? new Date(slip.placedAt).toLocaleString('en-GB')
+    : '—';
+
+  document.getElementById('sdSelections').innerHTML = (slip.selections || []).map(s => {
+    const market = MARKET_LABELS[s.marketType] || s.marketType;
+    const csTag = s.marketType === 'CORRECT_SCORE'
+      ? `<span class="cs-score-badge">CS</span>` : '';
+    return `<div class="selection-item">
+      <div style="flex:1">
+        <div class="selection-match">${s.homeTeam} vs ${s.awayTeam}</div>
+        <div class="selection-market">${market}${csTag}</div>
+      </div>
+      <div class="selection-odds">${Number(s.oddsAtPlacement).toFixed(2)}x</div>
+      <span class="badge badge-${statusClass[s.selectionStatus] || 'pending'}" style="margin-left:.5rem">${s.selectionStatus}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('slipDetailPanel').style.display = 'block';
+  lucide.createIcons();
+}
+</script>
+</body>
+</html>

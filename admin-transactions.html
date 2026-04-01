@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Transactions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.type-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.type-icon svg { width: 15px; height: 15px; }
+.type-cell { display: flex; align-items: center; gap: .6rem; }
+.type-label { font-weight: 600; font-size: .85rem; }
+.type-ref { font-size: .7rem; color: var(--t2); font-family: monospace; }
+
+.amount-positive { color: var(--green); font-family: var(--ffC); font-size: 1rem; font-weight: 700; }
+.amount-negative { color: var(--red); font-family: var(--ffC); font-size: 1rem; font-weight: 700; }
+
+.tabs { display: flex; gap: .4rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.tab-btn { padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--t2); font-size: .83rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.tab-btn.active { background: var(--accentBg); color: var(--accent); border-color: var(--borderAcc); }
+.tab-btn:hover:not(.active) { border-color: var(--borderHov); color: var(--t1); }
+
+.pagination { display: flex; align-items: center; gap: .4rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+.page-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--t2); font-size: .82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.page-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.page-btn:hover:not(.active) { border-color: var(--borderHov); color: var(--t1); }
+.page-info { font-size: .8rem; color: var(--t2); padding: 0 .5rem; }
+
+.loading-row td { text-align: center; padding: 3rem; color: var(--t2); }
+.error-row td { text-align: center; padding: 2rem; color: var(--red); }
+.empty-row td { text-align: center; padding: 3rem; color: var(--t2); }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<nav class="top-nav" id="topNav"></nav>
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<main class="main">
+  <div class="page-content">
+
+    <div class="page-header">
+      <div>
+        <div class="page-title">Transactions</div>
+        <div class="page-sub">Monitor all deposits, withdrawals, stakes and winnings.</div>
+      </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stat-grid" style="margin-bottom:1.5rem">
+      <div class="stat-card anim-1">
+        <div class="stat-icon green"><svg data-lucide="arrow-down-circle"></svg></div>
+        <div class="stat-val" id="statDeposits">—</div>
+        <div class="stat-label">Total Deposits</div>
+      </div>
+      <div class="stat-card anim-2">
+        <div class="stat-icon red"><svg data-lucide="arrow-up-circle"></svg></div>
+        <div class="stat-val" id="statWithdrawals">—</div>
+        <div class="stat-label">Total Withdrawals</div>
+      </div>
+      <div class="stat-card anim-3">
+        <div class="stat-icon accent"><svg data-lucide="ticket"></svg></div>
+        <div class="stat-val" id="statStakes">—</div>
+        <div class="stat-label">Total Bet Stakes</div>
+      </div>
+      <div class="stat-card anim-4">
+        <div class="stat-icon blue"><svg data-lucide="trophy"></svg></div>
+        <div class="stat-val" id="statWinnings">—</div>
+        <div class="stat-label">Total Winnings Paid</div>
+      </div>
+    </div>
+
+    <!-- Type filter tabs -->
+    <div class="tabs" id="typeTabs">
+      <button class="tab-btn active" onclick="filterTx('ALL', this)">All</button>
+      <button class="tab-btn" onclick="filterTx('DEPOSIT', this)">Deposits</button>
+      <button class="tab-btn" onclick="filterTx('WITHDRAWAL', this)">Withdrawals</button>
+      <button class="tab-btn" onclick="filterTx('BET_STAKE', this)">Bet Stakes</button>
+      <button class="tab-btn" onclick="filterTx('BET_WINNINGS', this)">Winnings</button>
+      <button class="tab-btn" onclick="filterTx('BET_REFUND', this)">Refunds</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <svg data-lucide="search"></svg>
+        <input type="text" class="search-input" id="txSearch"
+          placeholder="Search reference or user…" oninput="onSearchChange()">
+      </div>
+      <select class="form-select" id="statusFilter" onchange="onFilterChange()" style="width:auto;min-width:150px">
+        <option value="ALL">All Statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="SUCCESS">Successful</option>
+        <option value="FAILED">Failed</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Balance After</th>
+            <th>Status</th>
+            <th>Description</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="txBody">
+          <tr class="loading-row"><td colspan="7">Loading transactions…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="txPagination"></div>
+
+  </div>
+</main>
+
+<script src="admin-sidebar.js"></script>
+<script>
+const BASE_URL    = 'http://localhost:8080';
+const TX_PER_PAGE = 15;
+
+let allTx       = [];
+let currentType = 'ALL';
+let TX_PAGE     = 1;
+let searchTimer = null;
+
+const TYPE_ICON  = { DEPOSIT:'arrow-down-circle', WITHDRAWAL:'arrow-up-circle', BET_STAKE:'ticket', BET_WINNINGS:'trophy', BET_REFUND:'rotate-ccw' };
+const TYPE_COLOR = { DEPOSIT:'var(--green)', WITHDRAWAL:'var(--red)', BET_STAKE:'var(--accent)', BET_WINNINGS:'var(--blue)', BET_REFUND:'var(--orange)' };
+const TYPE_BG    = { DEPOSIT:'var(--greenBg)', WITHDRAWAL:'var(--redBg)', BET_STAKE:'var(--accentBg)', BET_WINNINGS:'var(--blueBg)', BET_REFUND:'var(--orangeBg)' };
+
+// ─── Init ────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  requireAuth();
+  injectAdminShell('admin-transactions.html');
+
+  const params     = new URLSearchParams(window.location.search);
+  const userSearch = params.get('search') || params.get('userId') || '';
+  if (userSearch) document.getElementById('txSearch').value = userSearch;
+
+  loadAll();
+});
+
+// ─── Load transactions + stats in parallel ───────────────────────────
+async function loadAll() {
+  await Promise.all([fetchTransactions(), fetchStats()]);
+}
+
+// ─── GET /api/v1/admin/transactions ──────────────────────────────────
+async function fetchTransactions() {
+  const token = localStorage.getItem('gstake_admin_token');
+  showLoading();
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/admin/transactions`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (res.status === 401) { adminLogout(); return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const json = await res.json();
+    const raw  = json.data ?? json.content ?? json;
+    allTx      = Array.isArray(raw) ? raw : [];
+
+    if (allTx.length === 0) {
+      showEmpty();
+      return;
+    }
+
+    renderTxTable();
+
+  } catch (err) {
+    console.error('Transactions fetch failed:', err);
+    showError('Failed to load transactions. Check your connection or API.');
+  }
+}
+
+// ─── GET /api/v1/admin/transactions/stats ────────────────────────────
+async function fetchStats() {
+  const token = localStorage.getItem('gstake_admin_token');
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/admin/transactions/stats`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const json = await res.json();
+    const s    = json.data ?? json;
+
+    const fmt = v => `GHS ${parseFloat(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    document.getElementById('statDeposits').textContent    = fmt(s.totalDeposits);
+    document.getElementById('statWithdrawals').textContent = fmt(s.totalWithdrawals);
+    document.getElementById('statStakes').textContent      = fmt(s.totalBetStakes);
+    document.getElementById('statWinnings').textContent    = fmt(s.totalWinnings);
+
+  } catch (err) {
+    console.error('Stats fetch failed:', err);
+    // Non-fatal — stats cards stay as — if this fails
+  }
+}
+
+// ─── Client-side filter ──────────────────────────────────────────────
+function getFilteredTx() {
+  const search = document.getElementById('txSearch').value.toLowerCase().trim();
+  const status = document.getElementById('statusFilter').value;
+
+  return allTx.filter(tx => {
+    if (currentType !== 'ALL' && tx.type !== currentType) return false;
+    if (status !== 'ALL' && tx.status !== status) return false;
+    if (search) {
+      const name  = (tx.userFullName || '').toLowerCase();
+      const email = (tx.userEmail    || '').toLowerCase();
+      const ref   = (tx.paymentReference || '').toLowerCase();
+      if (!name.includes(search) && !email.includes(search) && !ref.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+// ─── Render table ────────────────────────────────────────────────────
+function renderTxTable() {
+  const filtered   = getFilteredTx();
+  const total      = filtered.length;
+  const totalPages = Math.ceil(total / TX_PER_PAGE) || 1;
+  if (TX_PAGE > totalPages) TX_PAGE = 1;
+
+  const page  = filtered.slice((TX_PAGE - 1) * TX_PER_PAGE, TX_PAGE * TX_PER_PAGE);
+  const tbody = document.getElementById('txBody');
+
+  if (!page.length) {
+    tbody.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="7">
+          <svg data-lucide="inbox" style="width:32px;height:32px;margin-bottom:.6rem;opacity:.35"></svg><br>
+          No transactions yet.
+        </td>
+      </tr>`;
+    lucide.createIcons();
+    document.getElementById('txPagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = page.map(tx => {
+    const amount  = parseFloat(tx.amount) || 0;
+    const isPos   = amount >= 0;
+    const typeKey = tx.type || 'DEPOSIT';
+
+    const userName  = tx.userFullName || '—';
+    const userEmail = tx.userEmail    || '';
+
+    const balAfter = tx.balanceAfter != null
+      ? `GHS ${parseFloat(tx.balanceAfter).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+      : '—';
+
+    const date = tx.createdAt
+      ? new Date(tx.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+      : '—';
+
+    const statusClass = { SUCCESS:'success', PENDING:'pending', FAILED:'failed' }[tx.status] || 'pending';
+    const statusLabel = tx.status === 'SUCCESS' ? 'SUCCESSFUL' : (tx.status || 'PENDING');
+
+    return `<tr>
+      <td>
+        <div class="type-cell">
+          <div class="type-icon" style="background:${TYPE_BG[typeKey] || 'var(--bg3)'}">
+            <svg data-lucide="${TYPE_ICON[typeKey] || 'circle-dollar-sign'}"
+                 style="color:${TYPE_COLOR[typeKey] || 'var(--t2)'}"></svg>
+          </div>
+          <div>
+            <div class="type-label">${typeKey.replace(/_/g, ' ')}</div>
+            <div class="type-ref">${tx.paymentReference || '—'}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div style="font-weight:600;font-size:.85rem">${userName}</div>
+        <div style="font-size:.72rem;color:var(--t2)">${userEmail}</div>
+      </td>
+      <td class="${isPos ? 'amount-positive' : 'amount-negative'}">
+        ${isPos ? '+' : ''}GHS ${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+      </td>
+      <td style="font-family:var(--ffC);font-size:.95rem;font-weight:600">${balAfter}</td>
+      <td><span class="badge badge-${statusClass}">${statusLabel}</span></td>
+      <td class="td-muted"
+          style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+          title="${tx.description || ''}">${tx.description || '—'}</td>
+      <td class="td-muted">${date}</td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  let pages = '';
+  const maxVisible = Math.min(totalPages, 5);
+  for (let i = 1; i <= maxVisible; i++) {
+    pages += `<button class="page-btn${i === TX_PAGE ? ' active' : ''}" onclick="goTxPage(${i})">${i}</button>`;
+  }
+  document.getElementById('txPagination').innerHTML =
+    `<button class="page-btn" onclick="goTxPage(${TX_PAGE - 1})" ${TX_PAGE <= 1 ? 'disabled' : ''}>←</button>
+     ${pages}
+     <span class="page-info">${total} record${total !== 1 ? 's' : ''}</span>
+     <button class="page-btn" onclick="goTxPage(${TX_PAGE + 1})" ${TX_PAGE >= totalPages ? 'disabled' : ''}>→</button>`;
+
+  lucide.createIcons();
+}
+
+// ─── Event handlers ──────────────────────────────────────────────────
+function filterTx(type, btn) {
+  currentType = type;
+  TX_PAGE     = 1;
+  document.querySelectorAll('#typeTabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTxTable();
+}
+
+function onFilterChange() {
+  TX_PAGE = 1;
+  renderTxTable();
+}
+
+function onSearchChange() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { TX_PAGE = 1; renderTxTable(); }, 300);
+}
+
+function goTxPage(p) {
+  const totalPages = Math.ceil(getFilteredTx().length / TX_PER_PAGE) || 1;
+  if (p < 1 || p > totalPages) return;
+  TX_PAGE = p;
+  renderTxTable();
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────
+function showLoading() {
+  document.getElementById('txBody').innerHTML =
+    `<tr class="loading-row"><td colspan="7">Loading transactions…</td></tr>`;
+  document.getElementById('txPagination').innerHTML = '';
+}
+
+function showEmpty() {
+  document.getElementById('txBody').innerHTML = `
+    <tr class="empty-row">
+      <td colspan="7">
+        <svg data-lucide="inbox" style="width:32px;height:32px;margin-bottom:.6rem;opacity:.35"></svg><br>
+        No transactions yet.
+      </td>
+    </tr>`;
+  lucide.createIcons();
+  document.getElementById('txPagination').innerHTML = '';
+}
+
+function showError(msg) {
+  document.getElementById('txBody').innerHTML =
+    `<tr class="error-row"><td colspan="7">${msg}</td></tr>`;
+  document.getElementById('txPagination').innerHTML = '';
+}
+</script>
+</body>
+</html>

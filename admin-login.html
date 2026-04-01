@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.auth-page { position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;padding-top:var(--nav); }
+.auth-wrap { flex:1;display:flex;align-items:center;justify-content:center;padding:2.5rem 1rem 3.5rem; }
+.auth-card { width:100%;max-width:440px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rXl);padding:2.5rem 2.25rem;box-shadow:var(--shadow);animation:slideUp .45s cubic-bezier(.22,.68,0,1.2) both; }
+.auth-header { text-align:center;margin-bottom:2rem; }
+.auth-icon { width:58px;height:58px;background:var(--accentBg);border:1px solid var(--borderAcc);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 1.1rem; }
+.auth-icon svg { width:26px;height:26px;color:var(--accent); }
+.auth-title { font-family:var(--ffC);font-size:1.9rem;font-weight:800;letter-spacing:.5px;margin-bottom:.4rem; }
+.auth-sub { font-size:.82rem;color:var(--t2);line-height:1.6; }
+.auth-sub a { color:var(--accent);text-decoration:none;font-weight:600; }
+.auth-sub a:hover { text-decoration:underline; }
+.pw-toggle { position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;background:none;border:none;color:var(--t3);padding:4px;display:flex;align-items:center;transition:color .15s; }
+.pw-toggle:hover { color:var(--t2); }
+.pw-toggle svg { width:15px;height:15px; }
+.form-input.valid { border-color:var(--green); }
+.form-input.error { border-color:var(--red); }
+.field-hint { font-size:.7rem;margin-top:4px;display:flex;align-items:center;gap:3px;color:var(--t3); }
+.field-hint svg { width:11px;height:11px;flex-shrink:0; }
+.field-hint.ok { color:var(--green); }
+.field-hint.err { color:var(--red); }
+.form-check { display:flex;align-items:center;gap:.6rem;margin-bottom:1.5rem;cursor:pointer;user-select:none; }
+.custom-cb { width:18px;height:18px;border:1.5px solid var(--border);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);transition:all .15s; }
+.form-check input[type=checkbox] { position:absolute;opacity:0;width:0;height:0; }
+.form-check input[type=checkbox]:checked ~ .custom-cb { background:var(--accent);border-color:var(--accent); }
+.form-check input[type=checkbox]:checked ~ .custom-cb svg { display:block; }
+.custom-cb svg { display:none;width:11px;height:11px;color:#000; }
+.check-label { font-size:.82rem;color:var(--t2); }
+.btn-auth { width:100%;padding:.875rem;border-radius:11px;background:var(--accent);color:#000;font-family:var(--ffC);font-size:1.05rem;font-weight:800;letter-spacing:.6px;text-transform:uppercase;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.55rem;box-shadow:0 4px 20px rgba(245,166,35,.3);transition:all .2s; }
+.btn-auth:hover { filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 8px 32px rgba(245,166,35,.45); }
+.btn-auth:active { transform:translateY(0); }
+.btn-auth.loading { opacity:.7;pointer-events:none; }
+.btn-auth svg { width:18px;height:18px; }
+.trust-row { display:flex;gap:.5rem;margin-top:1.4rem;flex-wrap:wrap;justify-content:center; }
+.tbadge { display:inline-flex;align-items:center;gap:4px;font-size:.68rem;color:var(--t3);background:var(--accentBg);border:1px solid var(--border);border-radius:20px;padding:3px 9px; }
+.tbadge svg { width:10px;height:10px;color:var(--green); }
+.admin-warn { display:flex;align-items:center;gap:.6rem;background:var(--accentBg);border:1px solid var(--borderAcc);border-radius:var(--r);padding:.7rem 1rem;margin-bottom:1.5rem;font-size:.8rem;color:var(--accent); }
+.admin-warn svg { width:14px;height:14px;flex-shrink:0; }
+@media(max-width:480px) { .auth-card{padding:1.75rem 1.25rem;border-radius:var(--rLg);} .auth-title{font-size:1.5rem;} }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="top-nav">
+  <a href="index.html" class="logo">G<em>S</em>TAKE</a>
+  <span class="admin-badge">Admin Panel</span>
+  <div class="nav-spacer"></div>
+  <div class="nav-right" style="display:flex;align-items:center;gap:.5rem">
+    <div class="icon-btn" onclick="toggleTheme()" title="Toggle theme">
+      <svg data-lucide="moon" id="themeIco"></svg>
+    </div>
+    <a href="admin-register.html" class="btn btn-secondary btn-sm">Register Admin</a>
+  </div>
+</nav>
+
+<div class="auth-page">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-icon"><svg data-lucide="shield-check"></svg></div>
+        <div class="auth-title">Admin Access</div>
+        <div class="auth-sub">
+          Sign in to the GStake administration panel.<br>
+          Need an account? <a href="admin-register.html">Register here →</a>
+        </div>
+      </div>
+
+      <div class="admin-warn">
+        <svg data-lucide="alert-triangle"></svg>
+        Restricted area — authorised administrators only.
+      </div>
+
+      <div class="alert alert-error" id="alertBox">
+        <svg data-lucide="alert-circle"></svg>
+        <span id="alertMsg">Invalid credentials. Please try again.</span>
+      </div>
+      <div class="alert alert-success" id="successBox">
+        <svg data-lucide="check-circle"></svg>
+        <span id="successMsg">Signed in! Redirecting to dashboard…</span>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <div class="input-wrap">
+            <div class="input-icon"><svg data-lucide="mail"></svg></div>
+            <input type="email" id="email" class="form-input has-icon"
+              placeholder="admin@gstake.com" autocomplete="email" required>
+          </div>
+          <div class="field-hint" id="emailHint"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrap">
+            <div class="input-icon"><svg data-lucide="lock"></svg></div>
+            <input type="password" id="password" class="form-input has-icon"
+              placeholder="Enter your password" autocomplete="current-password"
+              style="padding-right:2.5rem" required>
+            <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Toggle password">
+              <svg data-lucide="eye" id="eyeIcon"></svg>
+            </button>
+          </div>
+          <div class="field-hint" id="pwHint"></div>
+        </div>
+
+        <label class="form-check" style="position:relative">
+          <input type="checkbox" id="remember">
+          <div class="custom-cb"><svg data-lucide="check"></svg></div>
+          <span class="check-label">Keep me signed in for 30 days</span>
+        </label>
+
+        <button type="submit" class="btn-auth" id="submitBtn">
+          <svg data-lucide="log-in" id="submitIco"></svg>
+          <span id="submitTxt">Sign In to Admin</span>
+        </button>
+      </form>
+
+      <div class="trust-row">
+        <span class="tbadge"><svg data-lucide="shield-check"></svg>SSL Encrypted</span>
+        <span class="tbadge"><svg data-lucide="lock"></svg>Role Protected</span>
+        <span class="tbadge"><svg data-lucide="zap"></svg>Instant Access</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin-api.js"></script>
+<script>
+window.addEventListener('load', () => {
+  if (getToken()) window.location.href = 'index.html';
+  lucide.createIcons();
+});
+
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('themeIco').setAttribute('data-lucide', dark ? 'sun' : 'moon');
+  lucide.createIcons();
+}
+
+function togglePw() {
+  const inp = document.getElementById('password');
+  const ico = document.getElementById('eyeIcon');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  ico.setAttribute('data-lucide', show ? 'eye-off' : 'eye');
+  lucide.createIcons();
+}
+
+function setHint(id, msg, type) {
+  const el = document.getElementById(id);
+  el.innerHTML = msg
+    ? `<svg data-lucide="${type === 'err' ? 'x-circle' : 'check-circle'}"></svg>${msg}`
+    : '';
+  el.className = 'field-hint' + (type ? ' ' + type : '');
+  lucide.createIcons();
+}
+
+function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+document.getElementById('email').addEventListener('blur', function () {
+  if (!this.value) return;
+  const ok = isValidEmail(this.value);
+  this.classList.toggle('valid', ok);
+  this.classList.toggle('error', !ok);
+  setHint('emailHint', ok ? 'Looks good!' : 'Enter a valid email address.', ok ? 'ok' : 'err');
+});
+
+document.getElementById('password').addEventListener('blur', function () {
+  if (!this.value) return;
+  const ok = this.value.length >= 8;
+  this.classList.toggle('valid', ok);
+  this.classList.toggle('error', !ok);
+  setHint('pwHint', ok ? '' : 'Password must be at least 8 characters.', ok ? 'ok' : 'err');
+});
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const alertBox = document.getElementById('alertBox');
+  alertBox.classList.remove('show');
+
+  if (!isValidEmail(email) || password.length < 8) {
+    document.getElementById('alertMsg').textContent = 'Please fill in all fields correctly.';
+    alertBox.classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  const ico = document.getElementById('submitIco');
+  const txt = document.getElementById('submitTxt');
+  btn.classList.add('loading');
+  ico.setAttribute('data-lucide', 'loader'); ico.className = 'spin';
+  txt.textContent = 'Signing in…';
+  lucide.createIcons();
+
+  try {
+    await apiAdminLogin(email, password);
+
+    txt.textContent = 'Welcome!';
+    ico.removeAttribute('class');
+    ico.setAttribute('data-lucide', 'check-circle');
+    lucide.createIcons();
+    document.getElementById('successBox').classList.add('show');
+    setTimeout(() => window.location.href = 'index.html', 700);
+  } catch (err) {
+    document.getElementById('alertMsg').textContent = err.message;
+    alertBox.classList.add('show');
+    btn.classList.remove('loading');
+    ico.removeAttribute('class');
+    ico.setAttribute('data-lucide', 'log-in');
+    txt.textContent = 'Sign In to Admin';
+    lucide.createIcons();
+  }
+}
+</script>
+</body>
+</html>

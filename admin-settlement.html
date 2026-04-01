@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Settlement & Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.settlement-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--rLg); padding: 1.25rem;
+  margin-bottom: 1rem; transition: border-color .2s;
+}
+.settlement-card:hover { border-color: var(--borderHov); }
+.settlement-card.selected { border-color: var(--accent); background: var(--accentBg); }
+
+.score-entry { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.score-input-wrap { display: flex; align-items: center; gap: .5rem; }
+.score-input { width: 56px; text-align: center; font-family: var(--ffC); font-size: 1.2rem; font-weight: 800; }
+.score-sep { font-family: var(--ffC); font-size: 1.3rem; font-weight: 800; color: var(--t3); }
+
+.result-summary {
+  background: var(--greenBg); border: 1px solid rgba(34,197,94,.25);
+  border-radius: var(--rLg); padding: 1.25rem; margin-top: 1rem;
+}
+.result-row { display: flex; justify-content: space-between; padding: .3rem 0; font-size: .85rem; }
+.result-label { color: var(--t2); }
+.result-val { font-family: var(--ffC); font-weight: 700; color: var(--green); }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<nav class="top-nav" id="topNav"></nav>
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<main class="main">
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Settlement & Results</div>
+        <div class="page-sub">Enter match results and auto-settle pending bets.</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-sm" onclick="loadGames()">
+          <svg data-lucide="refresh-cw"></svg> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="alert alert-success" id="settleSuccess" style="margin-bottom:1rem">
+      <svg data-lucide="check-circle"></svg>
+      <span id="settleSuccessMsg"></span>
+    </div>
+    <div class="alert alert-error" id="settleError" style="margin-bottom:1rem">
+      <svg data-lucide="alert-circle"></svg>
+      <span id="settleErrorMsg"></span>
+    </div>
+
+    <!-- Search / Filter -->
+    <div class="filter-bar" style="margin-bottom:1.25rem">
+      <div class="search-wrap">
+        <svg data-lucide="search"></svg>
+        <input type="text" class="search-input" id="settleSearch"
+          placeholder="Search teams…" oninput="renderGames()">
+      </div>
+    </div>
+
+    <div id="gamesContainer">
+      <div style="text-align:center;padding:3rem;color:var(--t2)">Loading games…</div>
+    </div>
+
+    <!-- Settlement result panel -->
+    <div id="settlementResult" style="display:none">
+      <div class="result-summary">
+        <div style="font-family:var(--ffC);font-weight:800;margin-bottom:.75rem;color:var(--green)">
+          ✅ Settlement Complete
+        </div>
+        <div class="result-row">
+          <span class="result-label">Game</span>
+          <span class="result-val" id="srGame"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Final Score</span>
+          <span class="result-val" id="srScore"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Slips Settled</span>
+          <span class="result-val" id="srSettled"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Winners</span>
+          <span class="result-val" id="srWinners"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Losers</span>
+          <span class="result-val" id="srLosers"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Total Paid Out</span>
+          <span class="result-val" id="srPaid"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="admin-api.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+let ALL_GAMES = [];
+
+window.addEventListener('load', () => {
+  requireAuth();
+  injectAdminShell('admin-settlement.html');
+  loadGames();
+});
+
+async function loadGames() {
+  try {
+    ALL_GAMES = await apiGetAllGames();
+    renderGames();
+  } catch (err) {
+    showAlert('error', 'Failed to load games: ' + err.message);
+  }
+}
+
+function renderGames() {
+  const search = document.getElementById('settleSearch').value.toLowerCase();
+  const settleable = ALL_GAMES.filter(g =>
+    g.status !== 'CANCELLED' &&
+    (!search || `${g.homeTeam} ${g.awayTeam}`.toLowerCase().includes(search))
+  ).sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate));
+
+  if (!settleable.length) {
+    document.getElementById('gamesContainer').innerHTML =
+      `<div style="text-align:center;padding:3rem;color:var(--t2)">No games available for settlement.</div>`;
+    return;
+  }
+
+  const statusClass = { UPCOMING: 'upcoming', LIVE: 'live', FINISHED: 'finished', CANCELLED: 'cancelled' };
+
+  document.getElementById('gamesContainer').innerHTML = settleable.map(g => {
+    const isFinished = g.status === 'FINISHED';
+    const score = (g.homeScore !== null && g.homeScore !== undefined)
+      ? `<span style="font-family:var(--ffC);font-weight:800;color:var(--accent)">${g.homeScore} – ${g.awayScore}</span>`
+      : '';
+
+    return `<div class="settlement-card" id="card-${g.id}">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <div style="font-weight:700;font-size:.95rem">${g.homeTeam} <span style="color:var(--t3)">vs</span> ${g.awayTeam}</div>
+          <div style="font-size:.75rem;color:var(--t2);margin-top:2px">${fmtDate(g.matchDate)}${g.bookingCode ? ' · ' + g.bookingCode : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          ${score}
+          <span class="badge badge-${statusClass[g.status] || 'upcoming'}">${g.status}</span>
+        </div>
+      </div>
+
+      ${!isFinished ? `
+      <div class="score-entry">
+        <div style="font-size:.78rem;color:var(--t2);font-weight:600;flex-basis:100%">Enter Final Score:</div>
+        <div class="score-input-wrap">
+          <input type="number" class="form-input score-input" id="h-${g.id}" min="0" placeholder="0">
+          <span class="score-sep">—</span>
+          <input type="number" class="form-input score-input" id="a-${g.id}" min="0" placeholder="0">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="submitResult('${g.id}', '${g.homeTeam}', '${g.awayTeam}')">
+          <svg data-lucide="flag"></svg> Enter Result & Settle
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="cancelGameConfirm('${g.id}', '${g.homeTeam}', '${g.awayTeam}')">
+          <svg data-lucide="x-circle"></svg> Cancel Game
+        </button>
+      </div>` : `
+      <div style="margin-top:.65rem;font-size:.78rem;color:var(--t2)">
+        ✅ This game has been settled. Result: ${g.homeScore}–${g.awayScore}
+      </div>`}
+    </div>`;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+async function submitResult(gameId, home, away) {
+  const homeScore = parseInt(document.getElementById(`h-${gameId}`).value, 10);
+  const awayScore = parseInt(document.getElementById(`a-${gameId}`).value, 10);
+
+  if (isNaN(homeScore) || isNaN(awayScore)) {
+    showAlert('error', 'Please enter valid scores for both teams.');
+    return;
+  }
+
+  try {
+    // POST /api/v1/admin/games/{gameId}/result
+    const result = await apiEnterResult(gameId, homeScore, awayScore);
+
+    // Update local game state
+    const idx = ALL_GAMES.findIndex(g => g.id === gameId);
+    if (idx >= 0) {
+      ALL_GAMES[idx].status = 'FINISHED';
+      ALL_GAMES[idx].homeScore = homeScore;
+      ALL_GAMES[idx].awayScore = awayScore;
+    }
+
+    showAlert('success', `Result entered for ${home} vs ${away}. Bets settled.`);
+    renderGames();
+    showSettlementResult(result);
+  } catch (err) {
+    showAlert('error', err.message);
+  }
+}
+
+async function cancelGameConfirm(gameId, home, away) {
+  if (!confirm(`Cancel "${home} vs ${away}"? All pending bets will be refunded.`)) return;
+  try {
+    // POST /api/v1/admin/games/{gameId}/cancel
+    const result = await apiCancelGame(gameId);
+    const idx = ALL_GAMES.findIndex(g => g.id === gameId);
+    if (idx >= 0) ALL_GAMES[idx].status = 'CANCELLED';
+    showAlert('success', `Game cancelled. ${result.totalSlipsSettled} stake(s) refunded.`);
+    renderGames();
+  } catch (err) {
+    showAlert('error', err.message);
+  }
+}
+
+function showSettlementResult(r) {
+  document.getElementById('srGame').textContent = `${r.homeTeam} vs ${r.awayTeam}`;
+  document.getElementById('srScore').textContent = `${r.homeScore} – ${r.awayScore}`;
+  document.getElementById('srSettled').textContent = r.totalSlipsSettled;
+  document.getElementById('srWinners').textContent = r.totalWinners;
+  document.getElementById('srLosers').textContent = r.totalLosers;
+  document.getElementById('srPaid').textContent = `GHS ${Number(r.totalPayoutCredited).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  document.getElementById('settlementResult').style.display = 'block';
+  document.getElementById('settlementResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showAlert(type, msg) {
+  const id = type === 'success' ? 'settleSuccess' : 'settleError';
+  const msgId = type === 'success' ? 'settleSuccessMsg' : 'settleErrorMsg';
+  document.getElementById(msgId).textContent = msg;
+  const el = document.getElementById(id);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+  lucide.createIcons();
+}
+
+function fmtDate(d) {
+  return new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+</script>
+</body>
+</html>

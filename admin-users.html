@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Users</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.user-detail-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .84rem; }
+.user-detail-row:last-child { border-bottom: none; }
+.user-detail-label { color: var(--t2); }
+.user-detail-val { font-weight: 600; color: var(--t1); font-family: var(--ffC); }
+.wallet-card { background: var(--accentBg); border: 1px solid var(--borderAcc); border-radius: var(--rLg); padding: 1rem; margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; }
+.wallet-item-label { font-size: .7rem; color: var(--t2); }
+.wallet-item-val { font-family: var(--ffC); font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+.pagination { display: flex; align-items: center; gap: .4rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+.page-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--t2); font-size: .82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.page-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.page-btn:hover:not(.active) { border-color: var(--borderHov); color: var(--t1); }
+.page-info { font-size: .8rem; color: var(--t2); padding: 0 .5rem; }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<nav class="top-nav" id="topNav"></nav>
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<main class="main">
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Users</div>
+        <div class="page-sub">All registered accounts on GStake.</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-sm" onclick="loadUsers()">
+          <svg data-lucide="refresh-cw"></svg> Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stat-grid" style="margin-bottom:1.5rem">
+      <div class="stat-card anim-1">
+        <div class="stat-icon accent"><svg data-lucide="users"></svg></div>
+        <div class="stat-val" id="statTotal">—</div>
+        <div class="stat-label">Total Users</div>
+      </div>
+      <div class="stat-card anim-2">
+        <div class="stat-icon green"><svg data-lucide="user-check"></svg></div>
+        <div class="stat-val" id="statActive">—</div>
+        <div class="stat-label">Active</div>
+      </div>
+      <div class="stat-card anim-3">
+        <div class="stat-icon red"><svg data-lucide="user-x"></svg></div>
+        <div class="stat-val" id="statInactive">—</div>
+        <div class="stat-label">Inactive</div>
+      </div>
+      <div class="stat-card anim-4">
+        <div class="stat-icon blue"><svg data-lucide="wallet"></svg></div>
+        <div class="stat-val" id="statDeposited">—</div>
+        <div class="stat-label">Have Deposited</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <svg data-lucide="search"></svg>
+        <input type="text" class="search-input" id="userSearch"
+          placeholder="Search name or email…" oninput="renderUsersTable()">
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Currency</th>
+            <th>Balance</th>
+            <th>Total Deposited</th>
+            <th>Total Withdrawn</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="usersPagination"></div>
+  </div>
+</main>
+
+<!-- USER DETAIL MODAL -->
+<div class="modal-backdrop" id="userDetailModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalUserName">User Detail</div>
+        <div style="font-size:.78rem;color:var(--t2)" id="modalUserEmail"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('userDetailModal')"><svg data-lucide="x"></svg></button>
+    </div>
+
+    <div class="wallet-card">
+      <div>
+        <div class="wallet-item-label">Balance</div>
+        <div class="wallet-item-val" id="modalBalance">—</div>
+      </div>
+      <div>
+        <div class="wallet-item-label">Deposited</div>
+        <div class="wallet-item-val" id="modalDeposited" style="color:var(--green)">—</div>
+      </div>
+      <div>
+        <div class="wallet-item-label">Withdrawn</div>
+        <div class="wallet-item-val" id="modalWithdrawn" style="color:var(--red)">—</div>
+      </div>
+    </div>
+
+    <div id="userDetailRows"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('userDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin-api.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+let ALL_USERS = [];
+let USER_PAGE = 1;
+const PER_PAGE = 10;
+
+window.addEventListener('load', () => {
+  requireAuth();
+  injectAdminShell('admin-users.html');
+  loadUsers();
+});
+
+async function loadUsers() {
+  try {
+    // GET /api/v1/admin/users
+    ALL_USERS = await apiGetAllUsers();
+    renderStats();
+    renderUsersTable();
+  } catch (err) {
+    console.error('Failed to load users:', err);
+  }
+}
+
+function renderStats() {
+  const active = ALL_USERS.filter(u => u.isActive !== false).length;
+  const deposited = ALL_USERS.filter(u => u.hasEverDeposited || (u.wallet && u.wallet.hasEverDeposited)).length;
+  document.getElementById('statTotal').textContent = ALL_USERS.length;
+  document.getElementById('statActive').textContent = active;
+  document.getElementById('statInactive').textContent = ALL_USERS.length - active;
+  document.getElementById('statDeposited').textContent = deposited;
+  lucide.createIcons();
+}
+
+function getFilteredUsers() {
+  const search = document.getElementById('userSearch').value.toLowerCase();
+  return ALL_USERS.filter(u =>
+    !search || `${u.fullName || ''} ${u.email}`.toLowerCase().includes(search)
+  );
+}
+
+function renderUsersTable() {
+  const filtered = getFilteredUsers();
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / PER_PAGE) || 1;
+  if (USER_PAGE > totalPages) USER_PAGE = 1;
+  const page = filtered.slice((USER_PAGE - 1) * PER_PAGE, USER_PAGE * PER_PAGE);
+
+  const tbody = document.getElementById('usersBody');
+  if (!page.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--t2)">No users found.</td></tr>`;
+    document.getElementById('usersPagination').innerHTML = '';
+    return;
+  }
+
+  const fmt = (v, curr) => v != null ? `${curr || 'GHS'} ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—';
+
+  tbody.innerHTML = page.map(u => {
+    const curr = u.currency || 'GHS';
+    const wallet = u.wallet || {};
+    const active = u.isActive !== false;
+    const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB') : '—';
+
+    return `<tr>
+      <td>
+        <div style="font-weight:600;font-size:.85rem">${u.fullName || '—'}</div>
+        <div style="font-size:.7rem;color:var(--t2)">${u.email}</div>
+      </td>
+      <td style="font-family:var(--ffC);font-weight:700">${curr}</td>
+      <td style="font-family:var(--ffC);font-weight:700;color:var(--accent)">${fmt(wallet.balance, curr)}</td>
+      <td style="color:var(--green)">${fmt(wallet.totalDeposited, curr)}</td>
+      <td style="color:var(--red)">${fmt(wallet.totalWithdrawn, curr)}</td>
+      <td><span class="badge badge-${active ? 'won' : 'failed'}">${active ? 'ACTIVE' : 'INACTIVE'}</span></td>
+      <td class="td-muted">${joined}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openUserDetail('${u.id}')">
+          <svg data-lucide="eye"></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  let pages = '';
+  for (let i = 1; i <= Math.min(totalPages, 7); i++) {
+    pages += `<button class="page-btn${i === USER_PAGE ? ' active' : ''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  document.getElementById('usersPagination').innerHTML =
+    `<button class="page-btn" onclick="goPage(${USER_PAGE - 1})" ${USER_PAGE <= 1 ? 'disabled' : ''}>←</button>
+     ${pages}
+     <span class="page-info">${total} users</span>
+     <button class="page-btn" onclick="goPage(${USER_PAGE + 1})" ${USER_PAGE >= totalPages ? 'disabled' : ''}>→</button>`;
+
+  lucide.createIcons();
+}
+
+function goPage(p) {
+  const total = Math.ceil(getFilteredUsers().length / PER_PAGE) || 1;
+  if (p < 1 || p > total) return;
+  USER_PAGE = p;
+  renderUsersTable();
+}
+
+async function openUserDetail(userId) {
+  try {
+    // GET /api/v1/admin/users/{userId}
+    const u = await apiGetUserById(userId);
+    const curr = u.currency || 'GHS';
+    const wallet = u.wallet || {};
+    const fmt = v => v != null ? `${curr} ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—';
+
+    document.getElementById('modalUserName').textContent = u.fullName || u.email;
+    document.getElementById('modalUserEmail').textContent = u.email;
+    document.getElementById('modalBalance').textContent = fmt(wallet.balance);
+    document.getElementById('modalDeposited').textContent = fmt(wallet.totalDeposited);
+    document.getElementById('modalWithdrawn').textContent = fmt(wallet.totalWithdrawn);
+
+    const rows = [
+      ['User ID', u.id],
+      ['Currency', curr],
+      ['Status', u.isActive !== false ? 'Active' : 'Inactive'],
+      ['Has Ever Deposited', wallet.hasEverDeposited ? 'Yes' : 'No'],
+      ['Phone', u.phoneNumber || '—'],
+      ['Joined', u.createdAt ? new Date(u.createdAt).toLocaleString('en-GB') : '—'],
+    ];
+
+    document.getElementById('userDetailRows').innerHTML = rows.map(([label, val]) =>
+      `<div class="user-detail-row">
+        <span class="user-detail-label">${label}</span>
+        <span class="user-detail-val">${val}</span>
+      </div>`
+    ).join('');
+
+    openModal('userDetailModal');
+    lucide.createIcons();
+  } catch (err) {
+    alert('Failed to load user: ' + err.message);
+  }
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+</script>
+</body>
+</html>

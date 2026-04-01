@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GStake Admin — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="admin-shared.css">
+<style>
+.grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .65rem; margin-bottom: 1.75rem; }
+.qa-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--rLg); padding: 1rem; display: flex; align-items: center; gap: .75rem; cursor: pointer; text-decoration: none; transition: all .18s; }
+.qa-card:hover { border-color: var(--borderAcc); background: var(--accentBg); transform: translateY(-1px); }
+.qa-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.qa-icon svg { width: 16px; height: 16px; }
+.qa-label { font-size: .82rem; font-weight: 600; color: var(--t1); line-height: 1.3; }
+.game-mini { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
+.game-mini:last-child { border-bottom: none; }
+.game-team-name { font-size: .83rem; font-weight: 600; }
+.game-date { font-size: .7rem; color: var(--t2); margin-top: 1px; }
+.game-odds-row { display: flex; gap: .3rem; }
+.odds-pill { font-size: .7rem; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--bg3); color: var(--accent); border: 1px solid var(--borderAcc); }
+.user-row { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
+.user-row:last-child { border-bottom: none; }
+.user-avatar-sm { width: 30px; height: 30px; border-radius: 50%; background: var(--accentBg2); border: 1px solid var(--borderAcc); display: flex; align-items: center; justify-content: center; font-family: var(--ffC); font-size: .75rem; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+.user-name { font-size: .83rem; font-weight: 600; color: var(--t1); }
+.user-email { font-size: .7rem; color: var(--t2); }
+.user-amount { margin-left: auto; font-family: var(--ffC); font-size: .95rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.metric-row { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--border); }
+.metric-row:last-child { border-bottom: none; }
+.skeleton { background: var(--bg3); border-radius: 6px; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+@media(max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+@media(max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } .quick-actions { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<nav class="top-nav" id="topNav"></nav>
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<main class="main">
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Here's what's happening on GStake.</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">
+          <svg data-lucide="refresh-cw"></svg> Refresh
+        </button>
+        <a href="admin-games.html" class="btn btn-primary btn-sm">
+          <svg data-lucide="plus"></svg> Add Game
+        </a>
+      </div>
+    </div>
+
+    <!-- Stat Cards — populated from API -->
+    <div class="stat-grid" id="statGrid" style="margin-bottom:1.75rem">
+      <div class="stat-card anim-1">
+        <div class="stat-icon accent"><svg data-lucide="users"></svg></div>
+        <div class="stat-val" id="statUsers">—</div>
+        <div class="stat-label">Registered Users</div>
+      </div>
+      <div class="stat-card anim-2">
+        <div class="stat-icon blue"><svg data-lucide="ticket"></svg></div>
+        <div class="stat-val" id="statGames">—</div>
+        <div class="stat-label">Upcoming Games</div>
+      </div>
+      <div class="stat-card anim-3">
+        <div class="stat-icon green"><svg data-lucide="activity"></svg></div>
+        <div class="stat-val" id="statLive">—</div>
+        <div class="stat-label">Live Games</div>
+      </div>
+      <div class="stat-card anim-4">
+        <div class="stat-icon red"><svg data-lucide="calendar"></svg></div>
+        <div class="stat-val" id="statTotal">—</div>
+        <div class="stat-label">Total Games</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <a href="admin-games.html" class="qa-card">
+        <div class="qa-icon" style="background:var(--accentBg);border:1px solid var(--borderAcc)">
+          <svg data-lucide="calendar" style="color:var(--accent)"></svg>
+        </div>
+        <div class="qa-label">Games & Odds</div>
+      </a>
+      <a href="admin-settlement.html" class="qa-card">
+        <div class="qa-icon" style="background:var(--greenBg);border:1px solid rgba(34,197,94,.2)">
+          <svg data-lucide="flag" style="color:var(--green)"></svg>
+        </div>
+        <div class="qa-label">Settlement & Results</div>
+      </a>
+      <a href="admin-bets.html" class="qa-card">
+        <div class="qa-icon" style="background:var(--blueBg);border:1px solid rgba(96,165,250,.2)">
+          <svg data-lucide="ticket" style="color:var(--blue)"></svg>
+        </div>
+        <div class="qa-label">Bet Slips</div>
+      </a>
+      <a href="admin-users.html" class="qa-card">
+        <div class="qa-icon" style="background:var(--orangeBg);border:1px solid rgba(251,146,60,.2)">
+          <svg data-lucide="users" style="color:var(--orange)"></svg>
+        </div>
+        <div class="qa-label">Users</div>
+      </a>
+      <a href="admin-transactions.html" class="qa-card">
+        <div class="qa-icon" style="background:var(--redBg);border:1px solid rgba(239,68,68,.2)">
+          <svg data-lucide="arrow-left-right" style="color:var(--red)"></svg>
+        </div>
+        <div class="qa-label">Transactions</div>
+      </a>
+    </div>
+
+    <!-- Main grid -->
+    <div class="grid-3" style="margin-bottom:1.25rem">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Upcoming Games</div>
+            <div class="card-sub">Next 5 scheduled matches</div>
+          </div>
+          <a href="admin-games.html" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div id="recentGamesList"><div class="skeleton" style="height:160px"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Users Overview</div></div>
+        <div id="usersOverviewList"><div class="skeleton" style="height:160px"></div></div>
+      </div>
+    </div>
+
+    <!-- Bottom grid -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">All Users</div>
+            <div class="card-sub">Registered accounts</div>
+          </div>
+          <a href="admin-users.html" class="btn btn-secondary btn-sm">All Users</a>
+        </div>
+        <div id="topDepositorsList"><div class="skeleton" style="height:160px"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Platform Metrics</div></div>
+        <div id="platformMetrics"><div class="skeleton" style="height:160px"></div></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="admin-api.js"></script>
+<script src="admin-sidebar.js"></script>
+<script>
+window.addEventListener('load', () => {
+  requireAuth();
+  injectAdminShell('admin-dashboard.html');
+  loadDashboard();
+});
+
+async function loadDashboard() {
+  try {
+    const [games, users] = await Promise.all([
+      apiGetAllGames(),
+      apiGetAllUsers(),
+    ]);
+
+    renderStats(games, users);
+    renderGames(games);
+    renderUsers(users);
+    renderMetrics(games, users);
+  } catch (err) {
+    console.error('Dashboard load error:', err);
+  }
+}
+
+function renderStats(games, users) {
+  const upcoming = games.filter(g => g.status === 'UPCOMING').length;
+  const live = games.filter(g => g.status === 'LIVE').length;
+  document.getElementById('statUsers').textContent = users.length.toLocaleString();
+  document.getElementById('statGames').textContent = upcoming.toLocaleString();
+  document.getElementById('statLive').textContent = live.toLocaleString();
+  document.getElementById('statTotal').textContent = games.length.toLocaleString();
+  lucide.createIcons();
+}
+
+function renderGames(games) {
+  const upcoming = games
+    .filter(g => g.status === 'UPCOMING')
+    .sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate))
+    .slice(0, 5);
+
+  document.getElementById('recentGamesList').innerHTML = upcoming.length
+    ? upcoming.map(g => `
+      <div class="game-mini">
+        <div style="flex:1">
+          <div class="game-team-name">${g.homeTeam} <span style="color:var(--t3);font-weight:400">vs</span> ${g.awayTeam}</div>
+          <div class="game-date">${fmtDate(g.matchDate)}</div>
+        </div>
+        <div class="game-odds-row">
+          <span class="odds-pill">${g.oddsHomeWin ?? '—'}</span>
+          <span class="odds-pill">${g.oddsDraw ?? '—'}</span>
+          <span class="odds-pill">${g.oddsAwayWin ?? '—'}</span>
+        </div>
+      </div>`).join('')
+    : `<div style="color:var(--t2);font-size:.82rem;padding:.5rem 0">No upcoming games.</div>`;
+}
+
+function renderUsers(users) {
+  const top5 = users.slice(0, 5);
+  document.getElementById('topDepositorsList').innerHTML = top5.length
+    ? top5.map(u => `
+      <div class="user-row">
+        <div class="user-avatar-sm">${(u.fullName || u.email || 'U').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div>
+          <div class="user-name">${u.fullName || '—'}</div>
+          <div class="user-email">${u.email}</div>
+        </div>
+        <div class="user-amount" style="color:var(--t2);font-size:.75rem">${u.currency || 'GHS'}</div>
+      </div>`).join('')
+    : `<div style="color:var(--t2);font-size:.82rem;padding:.5rem 0">No users yet.</div>`;
+
+  // Overview panel
+  const active = users.filter(u => u.isActive !== false).length;
+  document.getElementById('usersOverviewList').innerHTML = `
+    <div class="metric-row">
+      <div style="flex:1;font-size:.82rem;color:var(--t2)">Total Users</div>
+      <div style="font-family:var(--ffC);font-size:1rem;font-weight:700;color:var(--accent)">${users.length}</div>
+    </div>
+    <div class="metric-row">
+      <div style="flex:1;font-size:.82rem;color:var(--t2)">Active Users</div>
+      <div style="font-family:var(--ffC);font-size:1rem;font-weight:700;color:var(--green)">${active}</div>
+    </div>
+    <div class="metric-row">
+      <div style="flex:1;font-size:.82rem;color:var(--t2)">Inactive Users</div>
+      <div style="font-family:var(--ffC);font-size:1rem;font-weight:700;color:var(--red)">${users.length - active}</div>
+    </div>`;
+}
+
+function renderMetrics(games, users) {
+  const live = games.filter(g => g.status === 'LIVE').length;
+  const finished = games.filter(g => g.status === 'FINISHED').length;
+  const cancelled = games.filter(g => g.status === 'CANCELLED').length;
+  const colMap = { green: 'var(--green)', accent: 'var(--accent)', red: 'var(--red)', blue: 'var(--blue)', orange: 'var(--orange)' };
+  const bgMap = { green: 'var(--greenBg)', accent: 'var(--accentBg)', red: 'var(--redBg)', blue: 'var(--blueBg)', orange: 'var(--orangeBg)' };
+
+  const metrics = [
+    { label: 'Total Users', val: users.length, icon: 'users', col: 'accent' },
+    { label: 'Live Games', val: live, icon: 'activity', col: 'blue' },
+    { label: 'Finished Games', val: finished, icon: 'check-circle', col: 'green' },
+    { label: 'Cancelled Games', val: cancelled, icon: 'x-circle', col: 'red' },
+    { label: 'Upcoming Games', val: games.filter(g => g.status === 'UPCOMING').length, icon: 'calendar', col: 'orange' },
+    { label: 'Total Games', val: games.length, icon: 'list', col: 'accent' },
+  ];
+
+  document.getElementById('platformMetrics').innerHTML = metrics.map(m => `
+    <div class="metric-row">
+      <div style="width:30px;height:30px;border-radius:8px;background:${bgMap[m.col]};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg data-lucide="${m.icon}" style="width:14px;height:14px;color:${colMap[m.col]}"></svg>
+      </div>
+      <div style="flex:1;font-size:.82rem;color:var(--t2)">${m.label}</div>
+      <div style="font-family:var(--ffC);font-size:1rem;font-weight:700;color:${colMap[m.col]}">${m.val}</div>
+    </div>`).join('');
+
+  lucide.createIcons();
+}
+
+function fmtDate(d) {
+  return new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+</script>
+</body>
+</html>
