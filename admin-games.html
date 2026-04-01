@@ -64,6 +64,7 @@
       <span id="gameErrorMsg">Something went wrong.</span>
     </div>
 
+    <!-- Desktop table -->
     <div class="table-wrap">
       <table id="gamesTable">
         <thead>
@@ -77,15 +78,20 @@
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody id="gamesBody"><tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--t2)">Loading…</td></tr></tbody>
+        <tbody id="gamesBody">
+          <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--t2)">Loading…</td></tr>
+        </tbody>
       </table>
     </div>
 
+    <!-- Mobile cards -->
     <div class="game-cards-list" id="gameCards"></div>
   </div>
 </main>
 
-<!-- ADD / EDIT GAME MODAL -->
+<!-- ══════════════════════════════════════
+     ADD / EDIT GAME MODAL
+══════════════════════════════════════ -->
 <div class="modal-backdrop" id="gameModal">
   <div class="modal">
     <div class="modal-header">
@@ -115,7 +121,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Booking Code</label>
-          <input type="text" class="form-input" id="bookingCode" placeholder="Optional code">
+          <input type="text" class="form-input" id="bookingCode" placeholder="Optional — auto-generated if blank">
         </div>
       </div>
       <hr class="divider">
@@ -145,7 +151,9 @@
   </div>
 </div>
 
-<!-- DELETE CONFIRM MODAL -->
+<!-- ══════════════════════════════════════
+     DELETE SINGLE GAME MODAL
+══════════════════════════════════════ -->
 <div class="modal-backdrop" id="deleteModal">
   <div class="modal confirm-modal">
     <div class="confirm-text">
@@ -153,9 +161,14 @@
       <div class="confirm-title">Delete Game?</div>
       <div class="confirm-sub" id="deleteConfirmMsg">This game will be permanently deleted.</div>
     </div>
+    <!-- ★ stores the ID of the game to delete -->
     <input type="hidden" id="deleteGameId">
+    <div class="alert alert-error" id="deleteErrorAlert" style="margin:.75rem 0">
+      <svg data-lucide="alert-circle"></svg>
+      <span id="deleteErrorMsg">Failed to delete game.</span>
+    </div>
     <div class="modal-footer" style="justify-content:center">
-      <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-secondary" id="deleteCancelBtn" onclick="closeModal('deleteModal')">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDelete()" id="deleteConfirmBtn">
         <svg data-lucide="trash-2"></svg> Delete Game
       </button>
@@ -163,7 +176,9 @@
   </div>
 </div>
 
-<!-- STATUS CHANGE MODAL -->
+<!-- ══════════════════════════════════════
+     STATUS CHANGE MODAL
+══════════════════════════════════════ -->
 <div class="modal-backdrop" id="statusModal">
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
@@ -183,7 +198,9 @@
   </div>
 </div>
 
-<!-- CORRECT SCORE MODAL -->
+<!-- ══════════════════════════════════════
+     CORRECT SCORE MODAL
+══════════════════════════════════════ -->
 <div class="modal-backdrop" id="csModal">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -193,8 +210,6 @@
     <p style="font-size:.85rem;color:var(--t2);margin-bottom:1.25rem" id="csModalDesc"></p>
     <input type="hidden" id="csGameId">
     <div id="csMarketStatus" style="margin-bottom:1rem"></div>
-
-    <!-- Reveal form -->
     <div id="csRevealForm" style="display:none">
       <div style="font-size:.8rem;font-weight:600;color:var(--t2);margin-bottom:.75rem">Enter Final Score to Reveal & Settle</div>
       <div class="form-row">
@@ -211,7 +226,6 @@
         <svg data-lucide="eye"></svg> Reveal & Settle Bets
       </button>
     </div>
-
     <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.75rem" id="csActions">
       <button class="btn btn-secondary" id="csGenerateBtn" onclick="generateCSOptions()">
         <svg data-lucide="refresh-cw"></svg> Generate Score Options
@@ -220,24 +234,28 @@
         <svg data-lucide="lock"></svg> Lock Market (Stop Bets)
       </button>
     </div>
-
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('csModal')">Close</button>
     </div>
   </div>
 </div>
 
-<!-- DELETE ALL GAMES MODAL -->
+<!-- ══════════════════════════════════════
+     DELETE ALL GAMES MODAL
+══════════════════════════════════════ -->
 <div class="modal-backdrop" id="deleteAllModal">
   <div class="modal confirm-modal">
     <div class="confirm-text">
       <div class="confirm-icon"><svg data-lucide="trash-2"></svg></div>
       <div class="confirm-title">Delete All Games?</div>
       <div class="confirm-sub">
-        All games will be permanently deleted regardless of status. This cannot be undone.
+        All <strong id="deleteAllCount">0</strong> game(s) will be permanently deleted regardless of status.
+        Bets &amp; selections are wiped automatically. This cannot be undone.
       </div>
     </div>
-    <div id="deleteAllProgress" style="display:none;margin:.75rem 0;font-size:.82rem;color:var(--t2);text-align:center;line-height:1.5"></div>
+    <div id="deleteAllProgress"
+         style="display:none;margin:.75rem 0;font-size:.82rem;color:var(--t2);text-align:center;line-height:1.7;padding:.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+    </div>
     <div class="modal-footer" style="justify-content:center">
       <button class="btn btn-secondary" onclick="closeModal('deleteAllModal')" id="deleteAllCancelBtn">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDeleteAll()" id="deleteAllConfirmBtn">
@@ -247,13 +265,22 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════ -->
 <script src="admin-api.js"></script>
 <script src="admin-sidebar.js"></script>
 <script>
+/* ─────────────────────────────────────────────────
+   State
+───────────────────────────────────────────────── */
 let GAMES = [];
 let currentFilter = 'ALL';
 let editingId = null;
 
+/* ─────────────────────────────────────────────────
+   Init
+───────────────────────────────────────────────── */
 window.addEventListener('load', () => {
   requireAuth();
   injectAdminShell('admin-games.html');
@@ -261,6 +288,9 @@ window.addEventListener('load', () => {
   loadGames();
 });
 
+/* ─────────────────────────────────────────────────
+   Load & render
+───────────────────────────────────────────────── */
 async function loadGames() {
   try {
     GAMES = await apiGetAllGames();
@@ -289,18 +319,18 @@ function renderDesktopTable(filtered) {
     return;
   }
   tbody.innerHTML = filtered.map(g => {
-    const statusClass = { UPCOMING: 'upcoming', LIVE: 'live', FINISHED: 'finished', CANCELLED: 'cancelled' }[g.status] || 'upcoming';
-    const score = (g.homeScore !== null && g.awayScore !== null && g.homeScore !== undefined)
+    const statusClass = { UPCOMING:'upcoming', LIVE:'live', FINISHED:'finished', CANCELLED:'cancelled' }[g.status] || 'upcoming';
+    const score = (g.homeScore != null && g.awayScore != null)
       ? `<div class="score-display"><span>${g.homeScore}</span><span class="score-sep">–</span><span>${g.awayScore}</span></div>`
       : '<span style="color:var(--t3);font-size:.8rem">—</span>';
     const canEdit = g.status === 'UPCOMING';
     const csStatus = g.correctScoreMarketStatus || 'OPEN';
-    const csClass = { OPEN: 'upcoming', LOCKED: 'live', SETTLED: 'finished' }[csStatus] || 'upcoming';
+    const csClass = { OPEN:'upcoming', LOCKED:'live', SETTLED:'finished' }[csStatus] || 'upcoming';
 
     return `<tr>
       <td>
-        <div style="font-weight:600;font-size:.88rem">${g.homeTeam} <span style="color:var(--t3)">vs</span> ${g.awayTeam}</div>
-        ${g.bookingCode ? `<div class="td-mono">${g.bookingCode}</div>` : ''}
+        <div style="font-weight:600;font-size:.88rem">${esc(g.homeTeam)} <span style="color:var(--t3)">vs</span> ${esc(g.awayTeam)}</div>
+        ${g.bookingCode ? `<div class="td-mono">${esc(g.bookingCode)}</div>` : ''}
       </td>
       <td class="td-muted">${fmtDate(g.matchDate)}</td>
       <td><span class="badge badge-${statusClass}">${g.status}</span></td>
@@ -321,14 +351,16 @@ function renderDesktopTable(filtered) {
       </td>
       <td>
         <div class="action-cell">
-          ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openEditModal('${g.id}')"><svg data-lucide="pencil"></svg></button>` : ''}
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" title="Edit" onclick="openEditModal('${g.id}')"><svg data-lucide="pencil"></svg></button>` : ''}
           <button class="btn btn-sm" style="background:rgba(245,166,35,.12);color:var(--accent);border-color:var(--borderAcc)" onclick="goToSettlement('${g.id}')">
             <svg data-lucide="flag"></svg> Settlement
           </button>
           <button class="btn btn-sm" style="background:var(--accentBg);color:var(--accent);border-color:var(--borderAcc)" onclick="openStatusModal('${g.id}')">
             <svg data-lucide="toggle-left"></svg> Status
           </button>
-          <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${g.id}')"><svg data-lucide="trash-2"></svg></button>
+          <button class="btn btn-danger btn-sm" title="Delete game" onclick="openDeleteModal('${g.id}')">
+            <svg data-lucide="trash-2"></svg>
+          </button>
         </div>
       </td>
     </tr>`;
@@ -342,20 +374,20 @@ function renderMobileCards(filtered) {
     return;
   }
   container.innerHTML = filtered.map(g => {
-    const statusClass = { UPCOMING: 'upcoming', LIVE: 'live', FINISHED: 'finished', CANCELLED: 'cancelled' }[g.status] || 'upcoming';
-    const score = (g.homeScore !== null && g.awayScore !== null && g.homeScore !== undefined)
-      ? `<div class="game-card-score">${g.homeTeam} <span style="color:var(--accent)">${g.homeScore} – ${g.awayScore}</span> ${g.awayTeam}</div>`
+    const statusClass = { UPCOMING:'upcoming', LIVE:'live', FINISHED:'finished', CANCELLED:'cancelled' }[g.status] || 'upcoming';
+    const score = (g.homeScore != null && g.awayScore != null)
+      ? `<div class="game-card-score">${esc(g.homeTeam)} <span style="color:var(--accent)">${g.homeScore} – ${g.awayScore}</span> ${esc(g.awayTeam)}</div>`
       : '';
     const canEdit = g.status === 'UPCOMING';
 
     return `<div class="game-card">
       <div class="game-card-top">
-        <div class="game-teams">${g.homeTeam}<span class="vs">vs</span>${g.awayTeam}</div>
+        <div class="game-teams">${esc(g.homeTeam)}<span class="vs">vs</span>${esc(g.awayTeam)}</div>
         <span class="badge badge-${statusClass}">${g.status}</span>
       </div>
       <div class="game-card-meta">
         <span class="game-date"><svg data-lucide="clock" style="width:11px;height:11px;display:inline;vertical-align:middle;margin-right:3px"></svg>${fmtDate(g.matchDate)}</span>
-        ${g.bookingCode ? `<span class="booking-code">${g.bookingCode}</span>` : ''}
+        ${g.bookingCode ? `<span class="booking-code">${esc(g.bookingCode)}</span>` : ''}
       </div>
       <div class="game-card-odds">
         <div class="odds-set">
@@ -373,12 +405,17 @@ function renderMobileCards(filtered) {
         <button class="btn btn-sm" style="background:rgba(96,165,250,.1);color:var(--blue);border-color:rgba(96,165,250,.3)" onclick="openCSModal('${g.id}')">
           <svg data-lucide="target"></svg> CS
         </button>
-        <button class="btn btn-danger btn-sm btn-icon-only" onclick="openDeleteModal('${g.id}')"><svg data-lucide="trash-2"></svg></button>
+        <button class="btn btn-danger btn-sm btn-icon-only" title="Delete" onclick="openDeleteModal('${g.id}')">
+          <svg data-lucide="trash-2"></svg>
+        </button>
       </div>
     </div>`;
   }).join('');
 }
 
+/* ─────────────────────────────────────────────────
+   Filter tabs
+───────────────────────────────────────────────── */
 function filterGames(status, btn) {
   currentFilter = status;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -386,10 +423,16 @@ function filterGames(status, btn) {
   renderGamesTable();
 }
 
+/* ─────────────────────────────────────────────────
+   Navigation
+───────────────────────────────────────────────── */
 function goToSettlement(gameId) {
   window.location.href = `admin-settlement.html?gameId=${gameId}`;
 }
 
+/* ─────────────────────────────────────────────────
+   Add / Edit modal
+───────────────────────────────────────────────── */
 function openAddModal() {
   editingId = null;
   document.getElementById('gameModalTitle').textContent = 'Add New Game';
@@ -405,14 +448,14 @@ function openEditModal(id) {
   if (!g) return;
   editingId = id;
   document.getElementById('gameModalTitle').textContent = 'Edit Game';
-  document.getElementById('editGameId').value = id;
-  document.getElementById('homeTeam').value = g.homeTeam;
-  document.getElementById('awayTeam').value = g.awayTeam;
-  document.getElementById('matchDate').value = (g.matchDate || '').slice(0, 16);
-  document.getElementById('bookingCode').value = g.bookingCode || '';
-  document.getElementById('oddsH').value = g.oddsHomeWin;
-  document.getElementById('oddsD').value = g.oddsDraw;
-  document.getElementById('oddsA').value = g.oddsAwayWin;
+  document.getElementById('editGameId').value   = id;
+  document.getElementById('homeTeam').value     = g.homeTeam;
+  document.getElementById('awayTeam').value     = g.awayTeam;
+  document.getElementById('matchDate').value    = (g.matchDate || '').slice(0, 16);
+  document.getElementById('bookingCode').value  = g.bookingCode || '';
+  document.getElementById('oddsH').value        = g.oddsHomeWin;
+  document.getElementById('oddsD').value        = g.oddsDraw;
+  document.getElementById('oddsA').value        = g.oddsAwayWin;
   document.getElementById('saveGameTxt').textContent = 'Update Game';
   document.getElementById('gameFormError').classList.remove('show');
   openModal('gameModal');
@@ -420,38 +463,40 @@ function openEditModal(id) {
 
 async function handleSaveGame(e) {
   e.preventDefault();
-  const homeTeam = document.getElementById('homeTeam').value.trim();
-  const awayTeam = document.getElementById('awayTeam').value.trim();
-  const matchDate = document.getElementById('matchDate').value;
+  const homeTeam    = document.getElementById('homeTeam').value.trim();
+  const awayTeam    = document.getElementById('awayTeam').value.trim();
+  const matchDate   = document.getElementById('matchDate').value;
   const bookingCode = document.getElementById('bookingCode').value.trim();
-  const payload = {
-    homeTeam, awayTeam, matchDate, bookingCode,
-    oddsHomeWin: parseFloat(document.getElementById('oddsH').value),
-    oddsDraw: parseFloat(document.getElementById('oddsD').value),
-    oddsAwayWin: parseFloat(document.getElementById('oddsA').value),
-  };
+  const oddsHomeWin = parseFloat(document.getElementById('oddsH').value);
+  const oddsDraw    = parseFloat(document.getElementById('oddsD').value);
+  const oddsAwayWin = parseFloat(document.getElementById('oddsA').value);
 
-  if (!homeTeam || !awayTeam || !matchDate || isNaN(payload.oddsHomeWin)) {
+  if (!homeTeam || !awayTeam || !matchDate || isNaN(oddsHomeWin) || isNaN(oddsDraw) || isNaN(oddsAwayWin)) {
+    document.getElementById('gameFormErrorMsg').textContent = 'Please fill all required fields.';
     document.getElementById('gameFormError').classList.add('show');
     return;
   }
+
+  const payload = { homeTeam, awayTeam, matchDate, bookingCode, oddsHomeWin, oddsDraw, oddsAwayWin };
 
   const btn = document.getElementById('saveGameBtn');
   const txt = document.getElementById('saveGameTxt');
   btn.classList.add('loading');
   txt.textContent = editingId ? 'Updating…' : 'Saving…';
+  document.getElementById('gameFormError').classList.remove('show');
 
   try {
     if (editingId) {
       const updated = await apiUpdateGame(editingId, payload);
       const idx = GAMES.findIndex(g => g.id === editingId);
       if (idx >= 0) GAMES[idx] = updated;
+      showAlert('success', 'Game updated successfully.');
     } else {
       const created = await apiAddGame(payload);
       GAMES.unshift(created);
+      showAlert('success', 'Game added successfully.');
     }
     closeModal('gameModal');
-    showAlert('success', editingId ? 'Game updated successfully.' : 'Game added successfully.');
     renderGamesTable();
   } catch (err) {
     document.getElementById('gameFormErrorMsg').textContent = err.message;
@@ -463,6 +508,9 @@ async function handleSaveGame(e) {
   }
 }
 
+/* ─────────────────────────────────────────────────
+   Status modal
+───────────────────────────────────────────────── */
 function openStatusModal(id) {
   const g = GAMES.find(x => x.id === id);
   if (!g) return;
@@ -493,91 +541,143 @@ async function setGameStatus(newStatus) {
   }
 }
 
+/* ─────────────────────────────────────────────────
+   DELETE SINGLE GAME
+   openDeleteModal  → stores id → confirmDelete calls apiDeleteGame
+───────────────────────────────────────────────── */
 function openDeleteModal(id) {
   const g = GAMES.find(x => x.id === id);
-  if (!g) return;
+  if (!g) {
+    showAlert('error', 'Game not found — try refreshing.');
+    return;
+  }
+  // Store the ID in the hidden input
   document.getElementById('deleteGameId').value = id;
   document.getElementById('deleteConfirmMsg').textContent =
-    `"${g.homeTeam} vs ${g.awayTeam}" will be permanently deleted.`;
+    `"${g.homeTeam} vs ${g.awayTeam}" will be permanently deleted along with all its bet selections.`;
+  document.getElementById('deleteErrorAlert').classList.remove('show');
   openModal('deleteModal');
+  lucide.createIcons();
 }
 
 async function confirmDelete() {
+  // Read the stored game ID
   const gameId = document.getElementById('deleteGameId').value;
-  const btn = document.getElementById('deleteConfirmBtn');
+
+  if (!gameId) {
+    showAlert('error', 'No game selected for deletion.');
+    return;
+  }
+
+  console.log('[confirmDelete] deleting gameId:', gameId);
+
+  const btn       = document.getElementById('deleteConfirmBtn');
+  const cancelBtn = document.getElementById('deleteCancelBtn');
   btn.classList.add('loading');
+  btn.disabled    = true;
+  cancelBtn.disabled = true;
+  document.getElementById('deleteErrorAlert').classList.remove('show');
+
   try {
-    await apiDeleteGame(gameId);
-    GAMES = GAMES.filter(g => g.id !== gameId);
+    await apiDeleteGame(gameId);                          // ← calls DELETE /admin/games/{id}
+    GAMES = GAMES.filter(g => g.id !== gameId);          // remove from local list
     closeModal('deleteModal');
     showAlert('success', 'Game deleted successfully.');
     renderGamesTable();
   } catch (err) {
-    showAlert('error', err.message);
+    // Show error inside the modal so user can see it
+    document.getElementById('deleteErrorMsg').textContent = err.message;
+    document.getElementById('deleteErrorAlert').classList.add('show');
+    console.error('[confirmDelete] error:', err);
   } finally {
     btn.classList.remove('loading');
+    btn.disabled       = false;
+    cancelBtn.disabled = false;
+    lucide.createIcons();
   }
 }
 
-/* ── Delete All Games ── */
+/* ─────────────────────────────────────────────────
+   DELETE ALL GAMES
+   Uses apiDeleteAllGames() from admin-api.js which
+   loops sequentially and reports progress.
+───────────────────────────────────────────────── */
 function openDeleteAllModal() {
+  // Refresh the game count shown in the modal
+  document.getElementById('deleteAllCount').textContent = GAMES.length;
+
   const progress = document.getElementById('deleteAllProgress');
   progress.style.display = 'none';
-  progress.textContent = '';
+  progress.textContent   = '';
+
   const btn = document.getElementById('deleteAllConfirmBtn');
   btn.disabled = false;
   btn.classList.remove('loading');
   document.getElementById('deleteAllCancelBtn').disabled = false;
+
   openModal('deleteAllModal');
   lucide.createIcons();
 }
 
 async function confirmDeleteAll() {
   const allGames = [...GAMES];
+
   if (!allGames.length) {
     showAlert('error', 'No games to delete.');
     closeModal('deleteAllModal');
     return;
   }
 
-  const btn = document.getElementById('deleteAllConfirmBtn');
+  const btn       = document.getElementById('deleteAllConfirmBtn');
   const cancelBtn = document.getElementById('deleteAllCancelBtn');
-  const progress = document.getElementById('deleteAllProgress');
+  const progress  = document.getElementById('deleteAllProgress');
 
   btn.classList.add('loading');
-  btn.disabled = true;
+  btn.disabled    = true;
   cancelBtn.disabled = true;
   progress.style.display = 'block';
+  progress.textContent   = 'Starting…';
 
-  let deleted = 0;
-  let failed = 0;
+  // Progress callback — updates the label in real time
+  const onProgress = (current, total, game) => {
+    progress.textContent = `Deleting ${current} of ${total}: ${game.homeTeam} vs ${game.awayTeam}…`;
+  };
 
-  for (let i = 0; i < allGames.length; i++) {
-    const g = allGames[i];
-    progress.textContent = `Deleting ${i + 1} of ${allGames.length}: ${g.homeTeam} vs ${g.awayTeam}…`;
-    try {
-      await apiDeleteGame(g.id);
-      GAMES = GAMES.filter(x => x.id !== g.id);
-      deleted++;
-    } catch (err) {
-      failed++;
+  try {
+    const { deleted, failed, errors } = await apiDeleteAllGames(allGames, onProgress);
+
+    // Remove successfully deleted games from local state
+    const deletedIds = new Set(
+      allGames
+        .filter((_, i) => !errors.find(e => e.game.id === allGames[i]?.id))
+        .map(g => g.id)
+    );
+    GAMES = GAMES.filter(g => !deletedIds.has(g.id));
+
+    // Reload from server to be safe
+    try { GAMES = await apiGetAllGames(); } catch { /* use local state */ }
+
+    closeModal('deleteAllModal');
+    renderGamesTable();
+
+    if (failed > 0) {
+      showAlert('error',
+        `Done — ${deleted} deleted, ${failed} failed. Check console for details.`);
+      errors.forEach(e => console.warn('[deleteAll] failed:', e.game.id, e.message));
+    } else {
+      showAlert('success', `${deleted} game${deleted !== 1 ? 's' : ''} deleted successfully.`);
     }
-  }
-
-  btn.classList.remove('loading');
-  btn.disabled = false;
-  cancelBtn.disabled = false;
-  closeModal('deleteAllModal');
-  renderGamesTable();
-
-  if (failed > 0) {
-    showAlert('error', `Done — ${deleted} deleted, ${failed} skipped (may have active bets).`);
-  } else {
-    showAlert('success', `${deleted} game${deleted !== 1 ? 's' : ''} deleted successfully.`);
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled       = false;
+    cancelBtn.disabled = false;
+    lucide.createIcons();
   }
 }
 
-/* ── Correct Score Market Modal ── */
+/* ─────────────────────────────────────────────────
+   Correct Score modal
+───────────────────────────────────────────────── */
 function openCSModal(id) {
   const g = GAMES.find(x => x.id === id);
   if (!g) return;
@@ -585,16 +685,16 @@ function openCSModal(id) {
   document.getElementById('csModalDesc').textContent = `${g.homeTeam} vs ${g.awayTeam}`;
 
   const status = g.correctScoreMarketStatus || 'OPEN';
-  const statusClass = { OPEN: 'upcoming', LOCKED: 'live', SETTLED: 'finished' }[status] || 'upcoming';
+  const statusClass = { OPEN:'upcoming', LOCKED:'live', SETTLED:'finished' }[status] || 'upcoming';
   document.getElementById('csMarketStatus').innerHTML =
     `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
       <span style="font-size:.78rem;color:var(--t2)">Market Status:</span>
       <span class="badge badge-${statusClass}">${status}</span>
     </div>`;
 
-  document.getElementById('csRevealForm').style.display = status === 'LOCKED' ? 'block' : 'none';
-  document.getElementById('csGenerateBtn').style.display = status === 'SETTLED' ? 'none' : '';
-  document.getElementById('csLockBtn').style.display = (status === 'OPEN') ? '' : 'none';
+  document.getElementById('csRevealForm').style.display  = status === 'LOCKED'   ? 'block' : 'none';
+  document.getElementById('csGenerateBtn').style.display = status === 'SETTLED'  ? 'none'  : '';
+  document.getElementById('csLockBtn').style.display     = status === 'OPEN'     ? ''      : 'none';
 
   openModal('csModal');
   lucide.createIcons();
@@ -637,7 +737,7 @@ async function lockCSMarket() {
 }
 
 async function revealCSMarket() {
-  const gameId = document.getElementById('csGameId').value;
+  const gameId    = document.getElementById('csGameId').value;
   const homeScore = parseInt(document.getElementById('csHomeScore').value, 10);
   const awayScore = parseInt(document.getElementById('csAwayScore').value, 10);
   if (isNaN(homeScore) || isNaN(awayScore)) {
@@ -656,20 +756,34 @@ async function revealCSMarket() {
   }
 }
 
-function openModal(id) { document.getElementById(id).classList.add('show'); }
+/* ─────────────────────────────────────────────────
+   Utilities
+───────────────────────────────────────────────── */
+function openModal(id)  { document.getElementById(id).classList.add('show');    lucide.createIcons(); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
 function fmtDate(d) {
-  return new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-GB', {
+    day:'2-digit', month:'short', year:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+}
+
+// Simple XSS-safe escaper for team names / codes rendered into innerHTML
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function showAlert(type, msg) {
-  const id = type === 'success' ? 'gameSuccessAlert' : 'gameErrorAlert';
-  const msgId = type === 'success' ? 'gameSuccessMsg' : 'gameErrorMsg';
+  const id    = type === 'success' ? 'gameSuccessAlert' : 'gameErrorAlert';
+  const msgId = type === 'success' ? 'gameSuccessMsg'   : 'gameErrorMsg';
   document.getElementById(msgId).textContent = msg;
   const el = document.getElementById(id);
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 4000);
+  setTimeout(() => el.classList.remove('show'), 5000);
   lucide.createIcons();
 }
 </script>
