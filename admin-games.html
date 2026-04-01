@@ -453,25 +453,23 @@ function openStatusModal(id) {
   openModal('statusModal');
 }
 
+
+// In admin-games.html — replace the existing setGameStatus function
 async function setGameStatus(newStatus) {
   const gameId = document.getElementById('statusGameId').value;
   try {
-    // There is no dedicated status PATCH in the provided controllers.
-    // CANCELLED → POST /api/v1/admin/games/{gameId}/cancel
-    // LIVE / UPCOMING require backend extension — use cancel for CANCELLED,
-    // and show a message for others until backend is extended.
     if (newStatus === 'CANCELLED') {
       await apiCancelGame(gameId);
       const idx = GAMES.findIndex(g => g.id === gameId);
       if (idx >= 0) GAMES[idx].status = 'CANCELLED';
-      closeModal('statusModal');
       showAlert('success', 'Game cancelled and all stakes refunded.');
     } else {
-      // LIVE / UPCOMING status changes require a backend PATCH endpoint.
-      // Document the gap for the developer.
-      closeModal('statusModal');
-      showAlert('error', `Setting status to ${newStatus} requires a backend PATCH /api/v1/admin/games/{id}/status endpoint. Please implement it.`);
+      const updated = await apiUpdateGameStatus(gameId, newStatus);
+      const idx = GAMES.findIndex(g => g.id === gameId);
+      if (idx >= 0) GAMES[idx] = updated;
+      showAlert('success', `Game status set to ${newStatus}.`);
     }
+    closeModal('statusModal');
     renderGamesTable();
   } catch (err) {
     showAlert('error', err.message);

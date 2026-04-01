@@ -248,3 +248,8 @@ function adminLogout() {
   localStorage.removeItem('gstake_admin');
   window.location.href = 'admin-login.html';
 }
+
+// In admin-api.js — add this new function
+async function apiUpdateGameStatus(gameId, status) {
+  return await apiPatch(`/api/v1/admin/games/${gameId}/status?status=${status}`);
+}
