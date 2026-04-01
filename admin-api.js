@@ -65,9 +65,18 @@ async function apiFetch(url, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    // Log full response body to console so you can see validation errors
     console.error('[apiFetch] error response:', data);
-    throw new Error(data.message || data.error || `Request failed (${res.status})`);
+
+    // Extract field-level validation errors from data.data (Spring returns these on 400)
+    let detail = '';
+    if (data.data && typeof data.data === 'object') {
+      detail = Object.entries(data.data)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join('; ');
+    }
+
+    const message = data.message || data.error || `Request failed (${res.status})`;
+    throw new Error(detail ? `${message} — ${detail}` : message);
   }
 
   return data.data !== undefined ? data.data : data;
@@ -169,18 +178,23 @@ async function apiCancelGame(gameId) {
 
 /**
  * Normalise a game payload before sending:
- *  - matchDate: "2025-07-15T14:30"  →  "2025-07-15T14:30:00"
- *  - bookingCode: strip empty string (send null / omit so backend auto-generates)
+ *  - matchDate: strips timezone suffix, ensures full "YYYY-MM-DDTHH:mm:ss" format
+ *  - bookingCode: strip empty string so backend auto-generates
  */
 function normaliseGamePayload(payload) {
   const p = { ...payload };
 
-  if (p.matchDate && p.matchDate.length === 16) {
-    p.matchDate = p.matchDate + ':00';           // add missing seconds
+  if (p.matchDate) {
+    // Strip any trailing Z or milliseconds the browser might append
+    p.matchDate = p.matchDate.replace('Z', '').split('.')[0];
+    // Pad missing seconds: "2025-07-15T14:30" → "2025-07-15T14:30:00"
+    if (p.matchDate.length === 16) {
+      p.matchDate = p.matchDate + ':00';
+    }
   }
 
   if (!p.bookingCode) {
-    delete p.bookingCode;                        // let backend auto-generate
+    delete p.bookingCode;  // let backend auto-generate
   }
 
   return p;
