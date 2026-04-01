@@ -8,11 +8,6 @@ const CORRECT_SCORE_API = 'https://kikiwebbackend.onrender.com/api/admin/correct
 
 /* ── Auth helpers ── */
 
-/**
- * Token priority:
- *  1. gstake_admin_token  — set after apiAdminLogin()
- *  2. gstake_token        — set after regular register / login (user may be ADMIN role)
- */
 function getToken() {
   return localStorage.getItem('gstake_admin_token')
       || localStorage.getItem('gstake_token')
@@ -62,12 +57,16 @@ async function apiFetch(url, options = {}) {
     throw new Error('Session expired. Please sign in again.');
   }
 
-  const data = await res.json().catch(() => ({}));
+  // DELETE often returns 200 with no body — handle gracefully
+  const text = await res.text();
+  let data = {};
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = {}; }
+  }
 
   if (!res.ok) {
-    console.error('[apiFetch] error response:', data);
+    console.error('[apiFetch] error response:', data, '| raw:', text);
 
-    // Extract field-level validation errors from data.data (Spring returns these on 400)
     let detail = '';
     if (data.data && typeof data.data === 'object') {
       detail = Object.entries(data.data)
@@ -138,11 +137,7 @@ async function apiGetGameById(gameId) {
   return apiFetch(`${API_BASE}/games/public/${gameId}`);
 }
 
-/**
- * POST /api/v1/admin/games
- * Ensures matchDate is a full ISO-8601 string: "2025-07-15T14:30:00"
- * (datetime-local input gives "2025-07-15T14:30" — missing seconds → Spring rejects it)
- */
+/** POST /api/v1/admin/games */
 async function apiAddGame(payload) {
   return apiFetch(`${ADMIN_API}/games`, {
     method: 'POST',
@@ -152,9 +147,16 @@ async function apiAddGame(payload) {
 
 /** PATCH /api/v1/admin/games/{gameId} */
 async function apiUpdateGame(gameId, payload) {
+  // Only send fields the backend UpdateGameRequest DTO accepts
+  const { homeTeam, awayTeam, matchDate, bookingCode,
+          oddsHomeWin, oddsDraw, oddsAwayWin } = payload;
+
+  const clean = { homeTeam, awayTeam, matchDate, oddsHomeWin, oddsDraw, oddsAwayWin };
+  if (bookingCode) clean.bookingCode = bookingCode;
+
   return apiFetch(`${ADMIN_API}/games/${gameId}`, {
     method: 'PATCH',
-    body: JSON.stringify(normaliseGamePayload(payload)),
+    body: JSON.stringify(normaliseGamePayload(clean)),
   });
 }
 
@@ -165,9 +167,38 @@ async function apiUpdateGameStatus(gameId, status) {
   });
 }
 
-/** DELETE /api/v1/admin/games/{gameId} */
+/**
+ * DELETE /api/v1/admin/games/{gameId}
+ * Backend: wipes betSelections first, then deletes game — safe for any status.
+ */
 async function apiDeleteGame(gameId) {
+  if (!gameId) throw new Error('No gameId provided to apiDeleteGame');
+  console.debug('[apiDeleteGame] deleting:', gameId);
   return apiFetch(`${ADMIN_API}/games/${gameId}`, { method: 'DELETE' });
+}
+
+/**
+ * Delete every game sequentially.
+ * Returns { deleted, failed, errors[] }
+ */
+async function apiDeleteAllGames(games, onProgress) {
+  let deleted = 0, failed = 0;
+  const errors = [];
+
+  for (let i = 0; i < games.length; i++) {
+    const g = games[i];
+    if (onProgress) onProgress(i + 1, games.length, g);
+    try {
+      await apiDeleteGame(g.id);
+      deleted++;
+    } catch (err) {
+      failed++;
+      errors.push({ game: g, message: err.message });
+      console.warn('[apiDeleteAllGames] failed for', g.id, err.message);
+    }
+  }
+
+  return { deleted, failed, errors };
 }
 
 /** POST /api/v1/admin/games/{gameId}/result */
@@ -184,25 +215,24 @@ async function apiCancelGame(gameId) {
 }
 
 /**
- * Normalise a game payload before sending:
- *  - matchDate: strips timezone suffix, ensures full "YYYY-MM-DDTHH:mm:ss" format
- *  - bookingCode: strip empty string so backend auto-generates
+ * Normalise a game payload:
+ *  - matchDate → full "YYYY-MM-DDTHH:mm:ss" (Spring LocalDateTime format)
+ *  - odds      → floats, not strings
+ *  - bookingCode → omit if empty (backend auto-generates)
  */
 function normaliseGamePayload(payload) {
   const p = { ...payload };
 
   if (p.matchDate) {
-    // Strip any trailing Z or milliseconds the browser might append
     p.matchDate = p.matchDate.replace('Z', '').split('.')[0];
-    // Pad missing seconds: "2025-07-15T14:30" → "2025-07-15T14:30:00"
-    if (p.matchDate.length === 16) {
-      p.matchDate = p.matchDate + ':00';
-    }
+    if (p.matchDate.length === 16) p.matchDate += ':00';
   }
 
-  if (!p.bookingCode) {
-    delete p.bookingCode;  // let backend auto-generate
-  }
+  ['oddsHomeWin', 'oddsDraw', 'oddsAwayWin'].forEach(k => {
+    if (p[k] !== undefined && p[k] !== null) p[k] = parseFloat(p[k]);
+  });
+
+  if (!p.bookingCode) delete p.bookingCode;
 
   return p;
 }
