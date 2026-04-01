@@ -28,6 +28,9 @@
         <button class="btn btn-secondary btn-sm" onclick="loadGames()">
           <svg data-lucide="refresh-cw"></svg>
         </button>
+        <button class="btn btn-danger btn-sm" onclick="openDeleteAllModal()">
+          <svg data-lucide="trash-2"></svg> Delete All
+        </button>
         <button class="btn btn-primary" onclick="openAddModal()">
           <svg data-lucide="plus"></svg> Add Game
         </button>
@@ -224,6 +227,26 @@
   </div>
 </div>
 
+<!-- DELETE ALL GAMES MODAL -->
+<div class="modal-backdrop" id="deleteAllModal">
+  <div class="modal confirm-modal">
+    <div class="confirm-text">
+      <div class="confirm-icon"><svg data-lucide="trash-2"></svg></div>
+      <div class="confirm-title">Delete All Games?</div>
+      <div class="confirm-sub">
+        Only UPCOMING games without active bets will be deleted. Live, Finished, and Cancelled games are skipped.
+      </div>
+    </div>
+    <div id="deleteAllProgress" style="display:none;margin:.75rem 0;font-size:.82rem;color:var(--t2);text-align:center;line-height:1.5"></div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-secondary" onclick="closeModal('deleteAllModal')" id="deleteAllCancelBtn">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteAll()" id="deleteAllConfirmBtn">
+        <svg data-lucide="trash-2"></svg> Yes, Delete All
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="admin-api.js"></script>
 <script src="admin-sidebar.js"></script>
 <script>
@@ -240,7 +263,6 @@ window.addEventListener('load', () => {
 
 async function loadGames() {
   try {
-    // GET /api/v1/admin/games
     GAMES = await apiGetAllGames();
     renderGamesTable();
   } catch (err) {
@@ -386,7 +408,6 @@ function openEditModal(id) {
   document.getElementById('editGameId').value = id;
   document.getElementById('homeTeam').value = g.homeTeam;
   document.getElementById('awayTeam').value = g.awayTeam;
-  // matchDate may come from backend as ISO string
   document.getElementById('matchDate').value = (g.matchDate || '').slice(0, 16);
   document.getElementById('bookingCode').value = g.bookingCode || '';
   document.getElementById('oddsH').value = g.oddsHomeWin;
@@ -422,12 +443,10 @@ async function handleSaveGame(e) {
 
   try {
     if (editingId) {
-      // PATCH /api/v1/admin/games/{gameId}
       const updated = await apiUpdateGame(editingId, payload);
       const idx = GAMES.findIndex(g => g.id === editingId);
       if (idx >= 0) GAMES[idx] = updated;
     } else {
-      // POST /api/v1/admin/games
       const created = await apiAddGame(payload);
       GAMES.unshift(created);
     }
@@ -453,8 +472,6 @@ function openStatusModal(id) {
   openModal('statusModal');
 }
 
-
-// In admin-games.html — replace the existing setGameStatus function
 async function setGameStatus(newStatus) {
   const gameId = document.getElementById('statusGameId').value;
   try {
@@ -490,7 +507,6 @@ async function confirmDelete() {
   const btn = document.getElementById('deleteConfirmBtn');
   btn.classList.add('loading');
   try {
-    // DELETE /api/v1/admin/games/{gameId}
     await apiDeleteGame(gameId);
     GAMES = GAMES.filter(g => g.id !== gameId);
     closeModal('deleteModal');
@@ -500,6 +516,64 @@ async function confirmDelete() {
     showAlert('error', err.message);
   } finally {
     btn.classList.remove('loading');
+  }
+}
+
+/* ── Delete All Games ── */
+function openDeleteAllModal() {
+  const progress = document.getElementById('deleteAllProgress');
+  progress.style.display = 'none';
+  progress.textContent = '';
+  const btn = document.getElementById('deleteAllConfirmBtn');
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  document.getElementById('deleteAllCancelBtn').disabled = false;
+  openModal('deleteAllModal');
+  lucide.createIcons();
+}
+
+async function confirmDeleteAll() {
+  const upcomingGames = GAMES.filter(g => g.status === 'UPCOMING');
+  if (!upcomingGames.length) {
+    showAlert('error', 'No UPCOMING games to delete.');
+    closeModal('deleteAllModal');
+    return;
+  }
+
+  const btn = document.getElementById('deleteAllConfirmBtn');
+  const cancelBtn = document.getElementById('deleteAllCancelBtn');
+  const progress = document.getElementById('deleteAllProgress');
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+  cancelBtn.disabled = true;
+  progress.style.display = 'block';
+
+  let deleted = 0;
+  let failed = 0;
+
+  for (let i = 0; i < upcomingGames.length; i++) {
+    const g = upcomingGames[i];
+    progress.textContent = `Deleting ${i + 1} of ${upcomingGames.length}: ${g.homeTeam} vs ${g.awayTeam}…`;
+    try {
+      await apiDeleteGame(g.id);
+      GAMES = GAMES.filter(x => x.id !== g.id);
+      deleted++;
+    } catch (err) {
+      failed++;
+    }
+  }
+
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  cancelBtn.disabled = false;
+  closeModal('deleteAllModal');
+  renderGamesTable();
+
+  if (failed > 0) {
+    showAlert('error', `Done — ${deleted} deleted, ${failed} skipped (may have active bets).`);
+  } else {
+    showAlert('success', `${deleted} game${deleted !== 1 ? 's' : ''} deleted successfully.`);
   }
 }
 
@@ -518,11 +592,7 @@ function openCSModal(id) {
       <span class="badge badge-${statusClass}">${status}</span>
     </div>`;
 
-  // Show reveal form only when LOCKED
   document.getElementById('csRevealForm').style.display = status === 'LOCKED' ? 'block' : 'none';
-
-  // Show/hide action buttons by status
-  const actionsDiv = document.getElementById('csActions');
   document.getElementById('csGenerateBtn').style.display = status === 'SETTLED' ? 'none' : '';
   document.getElementById('csLockBtn').style.display = (status === 'OPEN') ? '' : 'none';
 
@@ -535,7 +605,6 @@ async function generateCSOptions() {
   const btn = document.getElementById('csGenerateBtn');
   btn.classList.add('loading');
   try {
-    // POST /api/admin/correct-score/{gameId}/generate
     await apiGenerateCSOptions(gameId);
     showAlert('success', 'Correct score options generated.');
     closeModal('csModal');
@@ -553,7 +622,6 @@ async function lockCSMarket() {
   const btn = document.getElementById('csLockBtn');
   btn.classList.add('loading');
   try {
-    // POST /api/admin/correct-score/{gameId}/lock
     const updated = await apiLockCSMarket(gameId);
     const idx = GAMES.findIndex(g => g.id === gameId);
     if (idx >= 0) GAMES[idx] = updated;
@@ -577,7 +645,6 @@ async function revealCSMarket() {
     return;
   }
   try {
-    // POST /api/admin/correct-score/{gameId}/reveal
     const updated = await apiRevealCSMarket(gameId, homeScore, awayScore);
     const idx = GAMES.findIndex(g => g.id === gameId);
     if (idx >= 0) GAMES[idx] = updated;

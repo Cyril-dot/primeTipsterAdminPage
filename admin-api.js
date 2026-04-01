@@ -158,6 +158,13 @@ async function apiUpdateGame(gameId, payload) {
   });
 }
 
+/** PATCH /api/v1/admin/games/{gameId}/status?status=LIVE */
+async function apiUpdateGameStatus(gameId, status) {
+  return apiFetch(`${ADMIN_API}/games/${gameId}/status?status=${status}`, {
+    method: 'PATCH',
+  });
+}
+
 /** DELETE /api/v1/admin/games/{gameId} */
 async function apiDeleteGame(gameId) {
   return apiFetch(`${ADMIN_API}/games/${gameId}`, { method: 'DELETE' });
@@ -247,9 +254,4 @@ function adminLogout() {
   localStorage.removeItem('gstake_admin_token');
   localStorage.removeItem('gstake_admin');
   window.location.href = 'admin-login.html';
-}
-
-// In admin-api.js — add this new function
-async function apiUpdateGameStatus(gameId, status) {
-  return await apiPatch(`/api/v1/admin/games/${gameId}/status?status=${status}`);
 }
