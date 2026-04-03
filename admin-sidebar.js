@@ -9,7 +9,7 @@ function injectAdminShell(activePage) {
     <button class="icon-btn" id="sidebarToggle" title="Toggle sidebar">
       <svg data-lucide="menu"></svg>
     </button>
-    <a href="index.html" class="logo">G<em>S</em>TAKE</a>
+    <a href="index.html" class="logo">Prime<em>S</em>takes</a>
     <span class="admin-badge">Admin Panel</span>
     <div class="nav-spacer"></div>
     <div class="nav-admin-info">
