@@ -178,10 +178,18 @@
   border: 1px solid var(--border);
   border-radius: var(--rLg);
   padding: 1.25rem;
-  transition: border-color .15s, transform .15s;
+  transition: border-color .15s, transform .15s, opacity .3s;
   animation: slideUp .35s both;
 }
 .code-card:hover { border-color: var(--borderHov); transform: translateY(-1px); }
+
+/* Delete fade-out animation */
+.code-card.deleting {
+  opacity: 0;
+  transform: scale(0.95) translateY(-4px);
+  pointer-events: none;
+}
+
 .code-card-top {
   display: flex;
   align-items: flex-start;
@@ -321,6 +329,18 @@
 }
 
 .modal { max-width: 620px; }
+
+/* btn-ghost-danger — subtle delete button */
+.btn-ghost-danger {
+  background: transparent;
+  border: 1px solid rgba(239,68,68,.3);
+  color: var(--red, #ef4444);
+  transition: background .15s, border-color .15s;
+}
+.btn-ghost-danger:hover {
+  background: rgba(239,68,68,.1);
+  border-color: rgba(239,68,68,.6);
+}
 </style>
 </head>
 <body>
@@ -508,7 +528,6 @@
 <script>
 /* ═══════════════════════════════════════════════
    BOOKING CODES — SELF-CONTAINED JS
-   No shared admin-api.js or admin-sidebar.js
 ═══════════════════════════════════════════════ */
 
 /* ── API endpoints ── */
@@ -528,6 +547,15 @@ const PER_PAGE       = 9;
 let currentDetailCode    = null;
 let currentScoreGameId   = null;
 let currentScoreBookingId = null;
+
+/* Hidden codes — stored by ID so they survive re-renders */
+const HIDDEN_CODES = new Set(
+  JSON.parse(localStorage.getItem('gstake_hidden_codes') || '[]')
+);
+
+function saveHidden() {
+  localStorage.setItem('gstake_hidden_codes', JSON.stringify([...HIDDEN_CODES]));
+}
 
 /* ══════════════════════════════════════════════
    AUTH HELPERS
@@ -685,7 +713,6 @@ async function loadAll() {
 async function loadCodes() {
   try {
     const data = await bcFetch(BC_API);
-    // handles plain array, Page<> with content field, or wrapped data
     ALL_CODES = Array.isArray(data) ? data : (data.content || data || []);
     updateStats();
     renderCodes();
@@ -705,14 +732,31 @@ async function loadGames() {
 }
 
 /* ══════════════════════════════════════════════
-   STATS
+   STATS  (excludes hidden codes)
 ══════════════════════════════════════════════ */
 function updateStats() {
-  document.getElementById('statTotal').textContent   = ALL_CODES.length;
-  document.getElementById('statActive').textContent  = ALL_CODES.filter(c => c.status === 'ACTIVE').length;
-  document.getElementById('statExpired').textContent = ALL_CODES.filter(c => c.status !== 'ACTIVE').length;
-  const totalBets = ALL_CODES.reduce((sum, c) => sum + (c.betCount || 0), 0);
+  const visible = ALL_CODES.filter(c => !HIDDEN_CODES.has(String(c.id)));
+  document.getElementById('statTotal').textContent   = visible.length;
+  document.getElementById('statActive').textContent  = visible.filter(c => c.status === 'ACTIVE').length;
+  document.getElementById('statExpired').textContent = visible.filter(c => c.status !== 'ACTIVE').length;
+  const totalBets = visible.reduce((sum, c) => sum + (c.betCount || 0), 0);
   document.getElementById('statBets').textContent = totalBets;
+}
+
+/* ══════════════════════════════════════════════
+   DELETE (hide locally)
+══════════════════════════════════════════════ */
+function deleteCode(codeId, cardEl) {
+  /* Animate the card out, then remove from DOM and state */
+  cardEl.classList.add('deleting');
+  setTimeout(() => {
+    HIDDEN_CODES.add(String(codeId));
+    saveHidden();
+    ALL_CODES = ALL_CODES.filter(c => String(c.id) !== String(codeId));
+    updateStats();
+    renderCodes();
+    showPageSuccess('Booking code removed from view.');
+  }, 300);
 }
 
 /* ══════════════════════════════════════════════
@@ -729,6 +773,7 @@ function setFilter(f, btn) {
 function renderCodes() {
   const q = (document.getElementById('codeSearch').value || '').toUpperCase();
   const filtered = ALL_CODES.filter(c => {
+    if (HIDDEN_CODES.has(String(c.id))) return false;
     if (codeFilter !== 'ALL' && c.status !== codeFilter) return false;
     if (q && !(c.code || '').includes(q)) return false;
     return true;
@@ -749,7 +794,7 @@ function renderCodes() {
   }
 
   grid.innerHTML = slice.map((c, i) => `
-    <div class="code-card" style="animation-delay:${i * 0.04}s">
+    <div class="code-card" style="animation-delay:${i * 0.04}s" id="card_${c.id}">
       <div class="code-card-top">
         <div>
           <div class="code-display" title="Click to copy" onclick="copyCode('${c.code}')">${c.code}</div>
@@ -783,11 +828,15 @@ function renderCodes() {
           <button class="btn btn-danger btn-sm" onclick="disableCode('${c.id}')">
             <svg data-lucide="ban"></svg> Disable
           </button>` : ''}
+        <button class="btn btn-sm btn-ghost-danger" title="Remove from view"
+          onclick="deleteCode('${c.id}', document.getElementById('card_${c.id}'))">
+          <svg data-lucide="trash-2"></svg> Delete
+        </button>
       </div>
     </div>
   `).join('');
 
-  // Pagination
+  /* Pagination */
   let pages = '';
   for (let i = 1; i <= Math.min(totalPages, 7); i++) {
     pages += `<button class="page-btn${i === PAGE ? ' active' : ''}" onclick="goPage(${i})">${i}</button>`;
@@ -804,6 +853,7 @@ function renderCodes() {
 function goPage(p) {
   const q        = document.getElementById('codeSearch').value;
   const filtered = ALL_CODES.filter(c => {
+    if (HIDDEN_CODES.has(String(c.id))) return false;
     if (codeFilter !== 'ALL' && c.status !== codeFilter) return false;
     if (q && !(c.code || '').toUpperCase().includes(q.toUpperCase())) return false;
     return true;
@@ -967,7 +1017,7 @@ async function submitCreate() {
   const games = Array.from(selectedGameIds).map((id, idx) => {
     const cfg = pickConfig[id];
     return {
-      gameId:   id,           // UUID string — matches backend UUID type
+      gameId:   id,
       pick:     cfg.pick,
       odds:     parseFloat(cfg.odds),
       position: idx + 1,
@@ -980,7 +1030,7 @@ async function submitCreate() {
   };
 
   const expiresAt = document.getElementById('expiresAt').value;
-  if (expiresAt) payload.expiresAt = expiresAt + ':00';   // "YYYY-MM-DDTHH:mm:ss"
+  if (expiresAt) payload.expiresAt = expiresAt + ':00';
 
   const btn = document.getElementById('createBtn');
   btn.classList.add('loading');
