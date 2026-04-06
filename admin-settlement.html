@@ -22,6 +22,24 @@
 .score-input { width: 56px; text-align: center; font-family: var(--ffC); font-size: 1.2rem; font-weight: 800; }
 .score-sep { font-family: var(--ffC); font-size: 1.3rem; font-weight: 800; color: var(--t3); }
 
+/* CS market status pill */
+.cs-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .7rem; font-weight: 700; padding: .2rem .55rem;
+  border-radius: 99px; letter-spacing: .4px; text-transform: uppercase;
+}
+.cs-badge.open   { background: rgba(96,165,250,.15); color: #60A5FA; border: 1px solid rgba(96,165,250,.3); }
+.cs-badge.locked { background: rgba(245,166,35,.15);  color: var(--accent); border: 1px solid rgba(245,166,35,.3); }
+.cs-badge.settled{ background: rgba(34,197,94,.15);  color: #22C55E; border: 1px solid rgba(34,197,94,.3); }
+.cs-badge.none   { background: var(--bg3); color: var(--t3); border: 1px solid var(--border); }
+
+.cs-notice {
+  margin-top: .65rem; padding: .55rem .75rem;
+  background: rgba(245,166,35,.08); border: 1px solid rgba(245,166,35,.2);
+  border-radius: 8px; font-size: .75rem; color: var(--accent);
+  display: flex; align-items: center; gap: .4rem;
+}
+
 /* ═══════════════════════════════════════════════════════
    ADMIN SETTLEMENT RESULT POPUP
 ═══════════════════════════════════════════════════════ */
@@ -134,6 +152,14 @@
   color: #22C55E; letter-spacing: .5px; line-height: 1;
 }
 
+/* CS settle row inside popup */
+.cs-settle-row {
+  background: rgba(245,166,35,.06); border: 1px solid rgba(245,166,35,.2);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;
+  font-size: .78rem; color: var(--t2); display: flex; align-items: center; gap: .5rem;
+}
+.cs-settle-row svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+
 .result-dismiss {
   width: 100%; padding: 13px; border: none; border-radius: 12px;
   background: var(--accent); color: #000;
@@ -213,6 +239,12 @@
       </div>
     </div>
 
+    <!-- CS settle info — shown only when CS market was also settled -->
+    <div class="cs-settle-row" id="rpCsRow" style="display:none">
+      <svg data-lucide="target"></svg>
+      <span id="rpCsMsg">Correct Score market also settled.</span>
+    </div>
+
     <div class="settle-stats">
       <div class="settle-stat">
         <div class="settle-stat-val acc" id="rpSettled">0</div>
@@ -249,7 +281,6 @@ window.addEventListener('load', () => {
   injectAdminShell('admin-settlement.html');
   loadGames();
 
-  // Pre-load game from URL param if coming from Games page
   const params = new URLSearchParams(window.location.search);
   const preGameId = params.get('gameId');
   if (preGameId) {
@@ -290,17 +321,42 @@ function renderGames() {
       ? `<span style="font-family:var(--ffC);font-weight:800;color:var(--accent)">${g.homeScore} – ${g.awayScore}</span>`
       : '';
 
+    // ── Correct Score market status pill ──
+    const csStatus = g.correctScoreMarketStatus || null; // OPEN | LOCKED | SETTLED | null
+    let csPill = '';
+    if (csStatus === 'LOCKED') {
+      csPill = `<span class="cs-badge locked">⚡ CS Locked</span>`;
+    } else if (csStatus === 'OPEN') {
+      csPill = `<span class="cs-badge open">CS Open</span>`;
+    } else if (csStatus === 'SETTLED') {
+      csPill = `<span class="cs-badge settled">✓ CS Settled</span>`;
+    } else {
+      csPill = `<span class="cs-badge none">No CS Market</span>`;
+    }
+
+    // ── Notice when CS is LOCKED — user knows it'll auto-settle ──
+    const csNotice = (csStatus === 'LOCKED' && !isFinished)
+      ? `<div class="cs-notice">
+           <svg data-lucide="info" style="width:13px;height:13px;flex-shrink:0"></svg>
+           Correct Score market is <strong style="color:var(--accent)">LOCKED</strong> — 
+           it will be automatically settled with the same score when you click "Enter Result".
+         </div>`
+      : '';
+
     return `<div class="settlement-card" id="card-${g.id}">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <div>
           <div style="font-weight:700;font-size:.95rem">${g.homeTeam} <span style="color:var(--t3)">vs</span> ${g.awayTeam}</div>
           <div style="font-size:.75rem;color:var(--t2);margin-top:2px">${fmtDate(g.matchDate)}${g.bookingCode ? ' · ' + g.bookingCode : ''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:.5rem">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
           ${score}
+          ${csPill}
           <span class="badge badge-${statusClass[g.status] || 'upcoming'}">${g.status}</span>
         </div>
       </div>
+
+      ${csNotice}
 
       ${!isFinished ? `
       <div class="score-entry">
@@ -311,7 +367,7 @@ function renderGames() {
           <input type="number" class="form-input score-input" id="a-${g.id}" min="0" placeholder="0">
         </div>
         <button class="btn btn-primary btn-sm" id="settle-btn-${g.id}"
-          onclick="submitResult('${g.id}', '${g.homeTeam.replace(/'/g,"\\'")}', '${g.awayTeam.replace(/'/g,"\\'")}')">
+          onclick="submitResult('${g.id}', '${g.homeTeam.replace(/'/g,"\\'")}', '${g.awayTeam.replace(/'/g,"\\'")}', '${csStatus || ''}')">
           <svg data-lucide="flag"></svg> Enter Result & Settle
         </button>
         <button class="btn btn-danger btn-sm"
@@ -328,7 +384,13 @@ function renderGames() {
   lucide.createIcons();
 }
 
-async function submitResult(gameId, home, away) {
+// ══════════════════════════════════════════════════════════════════
+// SUBMIT RESULT
+// Settles the main 1X2 market via apiEnterResult.
+// If the Correct Score market is LOCKED, also calls apiRevealCSMarket
+// with the same scores so CS bets are settled in the same action.
+// ══════════════════════════════════════════════════════════════════
+async function submitResult(gameId, home, away, csStatus) {
   const homeScore = parseInt(document.getElementById(`h-${gameId}`).value, 10);
   const awayScore = parseInt(document.getElementById(`a-${gameId}`).value, 10);
 
@@ -337,23 +399,41 @@ async function submitResult(gameId, home, away) {
     return;
   }
 
-  // Loading state on button
   const btn = document.getElementById(`settle-btn-${gameId}`);
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
 
-  try {
-    // POST /api/v1/admin/games/{gameId}/result
-    const result = await apiEnterResult(gameId, homeScore, awayScore);
+  let mainResult  = null;
+  let csSettled   = false;
+  let csError     = null;
 
+  try {
+    // ── Step 1: Settle main 1X2 market ──
+    mainResult = await apiEnterResult(gameId, homeScore, awayScore);
+
+    // ── Step 2: If CS market was LOCKED, reveal + settle it too ──
+    if (csStatus === 'LOCKED') {
+      try {
+        await apiRevealCSMarket(gameId, homeScore, awayScore);
+        csSettled = true;
+      } catch (err) {
+        // Don't block the UI — main market settled fine.
+        // Surface as a warning instead.
+        csError = err.message;
+        console.warn('[submitResult] CS reveal failed:', err.message);
+      }
+    }
+
+    // Update local cache
     const idx = ALL_GAMES.findIndex(g => g.id === gameId);
     if (idx >= 0) {
-      ALL_GAMES[idx].status    = 'FINISHED';
-      ALL_GAMES[idx].homeScore = homeScore;
-      ALL_GAMES[idx].awayScore = awayScore;
+      ALL_GAMES[idx].status     = 'FINISHED';
+      ALL_GAMES[idx].homeScore  = homeScore;
+      ALL_GAMES[idx].awayScore  = awayScore;
+      if (csSettled) ALL_GAMES[idx].correctScoreMarketStatus = 'SETTLED';
     }
 
     renderGames();
-    showSettlementPopup(result, home, away, homeScore, awayScore);
+    showSettlementPopup(mainResult, home, away, homeScore, awayScore, csSettled, csError);
 
   } catch (err) {
     showAlert('error', err.message);
@@ -364,7 +444,6 @@ async function submitResult(gameId, home, away) {
 async function cancelGameConfirm(gameId, home, away) {
   if (!confirm(`Cancel "${home} vs ${away}"? All pending bets will be refunded.`)) return;
   try {
-    // POST /api/v1/admin/games/{gameId}/cancel
     const result = await apiCancelGame(gameId);
     const idx = ALL_GAMES.findIndex(g => g.id === gameId);
     if (idx >= 0) ALL_GAMES[idx].status = 'CANCELLED';
@@ -377,9 +456,10 @@ async function cancelGameConfirm(gameId, home, away) {
 
 // ══════════════════════════════════════════════════════════════════
 // SETTLEMENT RESULT POPUP
+// csSettled = true  → show CS confirmation row
+// csError   = str   → show CS warning row instead
 // ══════════════════════════════════════════════════════════════════
-
-function showSettlementPopup(r, home, away, homeScore, awayScore) {
+function showSettlementPopup(r, home, away, homeScore, awayScore, csSettled, csError) {
   document.getElementById('rpMatch').textContent     = `${home} vs ${away}`;
   document.getElementById('rpHome').textContent      = home;
   document.getElementById('rpAway').textContent      = away;
@@ -391,8 +471,24 @@ function showSettlementPopup(r, home, away, homeScore, awayScore) {
   document.getElementById('rpPaid').textContent      =
     `GHS ${Number(r.totalPayoutCredited ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
-  spawnConfetti();
+  // CS row
+  const csRow = document.getElementById('rpCsRow');
+  const csMsg = document.getElementById('rpCsMsg');
+  if (csSettled) {
+    csRow.style.display = 'flex';
+    csMsg.textContent   = `Correct Score market also settled — score ${homeScore}:${awayScore} revealed to players.`;
+    csRow.style.borderColor = 'rgba(34,197,94,.3)';
+    csRow.style.background  = 'rgba(34,197,94,.06)';
+  } else if (csError) {
+    csRow.style.display = 'flex';
+    csMsg.textContent   = `⚠️ CS market settle failed: ${csError} — settle it manually from the Games page.`;
+    csRow.style.borderColor = 'rgba(239,68,68,.3)';
+    csRow.style.background  = 'rgba(239,68,68,.06)';
+  } else {
+    csRow.style.display = 'none';
+  }
 
+  spawnConfetti();
   document.getElementById('resultOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
   lucide.createIcons();
@@ -426,7 +522,6 @@ function spawnConfetti() {
 // ══════════════════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════════════════
-
 function showAlert(type, msg) {
   const id    = type === 'success' ? 'settleSuccess' : 'settleError';
   const msgId = type === 'success' ? 'settleSuccessMsg' : 'settleErrorMsg';
