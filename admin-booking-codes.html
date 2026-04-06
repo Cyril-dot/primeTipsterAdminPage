@@ -627,11 +627,9 @@ async function bcFetch(url, options = {}) {
   }
 
   if (!res.ok) {
-    const serverMsg = data.message || data.error || data.errors
-      ? (Array.isArray(data.errors)
-          ? data.errors.map(e => e.defaultMessage || e.message || JSON.stringify(e)).join('; ')
-          : data.message || data.error)
-      : null;
+    const serverMsg = data.message || data.error || (Array.isArray(data.errors)
+      ? data.errors.map(e => e.defaultMessage || e.message || JSON.stringify(e)).join('; ')
+      : null);
 
     const errMsg = serverMsg
       ? `${serverMsg} (HTTP ${res.status})`
@@ -1041,7 +1039,7 @@ async function loadCSOptionsForGame(gameId) {
     const firstOpt   = options[0];
     const firstScore = firstOpt.scorePrediction || '';
     const firstOdds  = parseFloat(firstOpt.odds) || 1;
-    const firstId    = firstOpt.id || '';
+    const firstId    = String(firstOpt.id || '');   // ← FIX: always string
 
     if (!pickConfig[gameId]?.correctScoreOptionId) {
       pickConfig[gameId] = {
@@ -1057,14 +1055,14 @@ async function loadCSOptionsForGame(gameId) {
 
     const currentSelId = pickConfig[gameId]?.correctScoreOptionId || firstId;
     const optionsHtml  = options.map(opt => {
-      const optId    = opt.id || '';
+      const optId    = String(opt.id || '');         // ← FIX: always string
       const optScore = opt.scorePrediction || '';
       const optOdds  = parseFloat(opt.odds || 1).toFixed(2);
       const sel      = optId === currentSelId ? 'selected' : '';
       return `<option value="${optId}" data-odds="${opt.odds || 1}" data-score="${optScore}" ${sel}>${optScore}  (${optOdds}x)</option>`;
     }).join('');
 
-    const currentOpt   = options.find(o => o.id === currentSelId) || firstOpt;
+    const currentOpt   = options.find(o => String(o.id) === currentSelId) || firstOpt;
     const previewScore = currentOpt.scorePrediction || '—';
     const previewOdds  = parseFloat(currentOpt.odds || 1).toFixed(2);
 
@@ -1104,7 +1102,7 @@ function retryCSOptions(gameId) {
 
 function onCSOptionChange(gameId, selectEl) {
   const opt      = selectEl.options[selectEl.selectedIndex];
-  const optId    = selectEl.value;
+  const optId    = String(selectEl.value);           // ← FIX: always string
   const optScore = opt.getAttribute('data-score') || '';
   const optOdds  = parseFloat(opt.getAttribute('data-odds')) || 1;
 
@@ -1163,8 +1161,8 @@ async function submitCreate() {
   if (selectedGameIds.size < 1) { showCreateError('Select at least 1 game.'); return; }
 
   for (const id of selectedGameIds) {
-    const cfg = pickConfig[id];
-    const g   = ALL_GAMES.find(x => String(x.id) === id);
+    const cfg  = pickConfig[id];
+    const g    = ALL_GAMES.find(x => String(x.id) === id);
     const name = g ? `${g.homeTeam} vs ${g.awayTeam}` : id;
 
     if (!cfg || !cfg.odds || cfg.odds < 1) {
@@ -1174,7 +1172,7 @@ async function submitCreate() {
       showCreateError(`Please set a pick for ${name}.`); return;
     }
     if (isCS) {
-      if (!cfg.correctScoreOptionId || cfg.correctScoreOptionId.trim() === '') {
+      if (!cfg.correctScoreOptionId || String(cfg.correctScoreOptionId).trim() === '') {
         showCreateError(`No score option selected for ${name}. If options failed to load, go to Games & Odds → CS Market and generate them first.`);
         return;
       }
@@ -1190,15 +1188,15 @@ async function submitCreate() {
     const cfg = pickConfig[id];
     if (isCS) {
       return {
-        gameId:               id,
+        gameId:               String(id),                              // ← FIX: explicit string UUID
         odds:                 parseFloat(cfg.odds),
         position:             idx + 1,
-        correctScoreOptionId: cfg.correctScoreOptionId.trim(),
+        correctScoreOptionId: String(cfg.correctScoreOptionId).trim(), // ← FIX: explicit string UUID
         scorePrediction:      cfg.scorePrediction.trim(),
       };
     } else {
       return {
-        gameId:   id,
+        gameId:   String(id),                                          // ← FIX: explicit string UUID
         odds:     parseFloat(cfg.odds),
         position: idx + 1,
         pick:     cfg.pick,
@@ -1219,7 +1217,9 @@ async function submitCreate() {
     games.forEach((g, i) => {
       console.log(`  Game ${i+1}:`, {
         gameId:               g.gameId,
+        gameIdType:           typeof g.gameId,
         correctScoreOptionId: g.correctScoreOptionId,
+        csOptIdType:          typeof g.correctScoreOptionId,
         scorePrediction:      g.scorePrediction,
         odds:                 g.odds,
       });
@@ -1400,13 +1400,14 @@ async function runSettlement(bookingCodeId) {
 }
 
 /* ═══════════════════════════════════════════════
-   DISABLE
+   DISABLE  ← FIX: CS uses PUT, standard uses PATCH
 ═══════════════════════════════════════════════ */
 async function disableCode(codeId, type) {
   if (!confirm('Disable this booking code? Users will no longer be able to use it.')) return;
   const endpoint = (type === 'CORRECT_SCORE' ? CS_API : STD_API) + `/${codeId}/disable`;
+  const method   =  type === 'CORRECT_SCORE' ? 'PUT' : 'PATCH';   // ← FIX
   try {
-    await bcFetch(endpoint, { method: 'PATCH' });
+    await bcFetch(endpoint, { method });
     showPageSuccess('Booking code disabled.');
     await loadCodes();
   } catch (err) {
