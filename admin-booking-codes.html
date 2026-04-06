@@ -592,7 +592,6 @@ async function bcFetch(url, options = {}) {
     ...(options.headers || {}),
   };
 
-  // ── REQUEST LOG ──────────────────────────────
   const logGroup = `[bcFetch] ${options.method || 'GET'} ${url}`;
   console.group(logGroup);
   console.log('Headers:', { ...headers, Authorization: token ? `Bearer ${token.slice(0,12)}…` : '(none)' });
@@ -604,13 +603,13 @@ async function bcFetch(url, options = {}) {
   const res  = await fetch(url, { ...options, headers });
   const text = await res.text();
 
-  // ── RESPONSE LOG ─────────────────────────────
   console.log(`Status: ${res.status} ${res.statusText}`);
   let data = {};
   if (text) {
     try {
       data = JSON.parse(text);
       console.log('Response JSON:', data);
+      console.log('Error detail:', JSON.stringify(data.data, null, 2));  // ← shows validation fields
     } catch {
       console.warn('Response (non-JSON):', text);
     }
@@ -1039,7 +1038,7 @@ async function loadCSOptionsForGame(gameId) {
     const firstOpt   = options[0];
     const firstScore = firstOpt.scorePrediction || '';
     const firstOdds  = parseFloat(firstOpt.odds) || 1;
-    const firstId    = String(firstOpt.id || '');   // ← FIX: always string
+    const firstId    = String(firstOpt.id || '');
 
     if (!pickConfig[gameId]?.correctScoreOptionId) {
       pickConfig[gameId] = {
@@ -1055,7 +1054,7 @@ async function loadCSOptionsForGame(gameId) {
 
     const currentSelId = pickConfig[gameId]?.correctScoreOptionId || firstId;
     const optionsHtml  = options.map(opt => {
-      const optId    = String(opt.id || '');         // ← FIX: always string
+      const optId    = String(opt.id || '');
       const optScore = opt.scorePrediction || '';
       const optOdds  = parseFloat(opt.odds || 1).toFixed(2);
       const sel      = optId === currentSelId ? 'selected' : '';
@@ -1102,7 +1101,7 @@ function retryCSOptions(gameId) {
 
 function onCSOptionChange(gameId, selectEl) {
   const opt      = selectEl.options[selectEl.selectedIndex];
-  const optId    = String(selectEl.value);           // ← FIX: always string
+  const optId    = String(selectEl.value);
   const optScore = opt.getAttribute('data-score') || '';
   const optOdds  = parseFloat(opt.getAttribute('data-odds')) || 1;
 
@@ -1173,7 +1172,7 @@ async function submitCreate() {
     }
     if (isCS) {
       if (!cfg.correctScoreOptionId || String(cfg.correctScoreOptionId).trim() === '') {
-        showCreateError(`No score option selected for ${name}. If options failed to load, go to Games & Odds → CS Market and generate them first.`);
+        showCreateError(`No score option selected for ${name}.`);
         return;
       }
       const pred = (cfg.scorePrediction || '').trim();
@@ -1188,15 +1187,15 @@ async function submitCreate() {
     const cfg = pickConfig[id];
     if (isCS) {
       return {
-        gameId:               String(id),                              // ← FIX: explicit string UUID
+        gameId:               String(id),
         odds:                 parseFloat(cfg.odds),
         position:             idx + 1,
-        correctScoreOptionId: String(cfg.correctScoreOptionId).trim(), // ← FIX: explicit string UUID
+        correctScoreOptionId: String(cfg.correctScoreOptionId).trim(),
         scorePrediction:      cfg.scorePrediction.trim(),
       };
     } else {
       return {
-        gameId:   String(id),                                          // ← FIX: explicit string UUID
+        gameId:   String(id),
         odds:     parseFloat(cfg.odds),
         position: idx + 1,
         pick:     cfg.pick,
@@ -1206,7 +1205,8 @@ async function submitCreate() {
 
   const payload   = { games };
   const expiresAt = document.getElementById('expiresAt').value;
-  if (expiresAt) payload.expiresAt = expiresAt + ':00';
+  // ← FIX: only append ':00' if the value is exactly 16 chars (HH:MM), not already HH:MM:SS
+  if (expiresAt) payload.expiresAt = expiresAt.length === 16 ? expiresAt + ':00' : expiresAt;
 
   // ── PRE-FLIGHT LOG ───────────────────────────
   console.group('[submitCreate] About to POST booking code');
@@ -1400,12 +1400,12 @@ async function runSettlement(bookingCodeId) {
 }
 
 /* ═══════════════════════════════════════════════
-   DISABLE  ← FIX: CS uses PUT, standard uses PATCH
+   DISABLE  ← CS uses PUT, standard uses PATCH
 ═══════════════════════════════════════════════ */
 async function disableCode(codeId, type) {
   if (!confirm('Disable this booking code? Users will no longer be able to use it.')) return;
   const endpoint = (type === 'CORRECT_SCORE' ? CS_API : STD_API) + `/${codeId}/disable`;
-  const method   =  type === 'CORRECT_SCORE' ? 'PUT' : 'PATCH';   // ← FIX
+  const method   =  type === 'CORRECT_SCORE' ? 'PUT' : 'PATCH';
   try {
     await bcFetch(endpoint, { method });
     showPageSuccess('Booking code disabled.');
